@@ -18,22 +18,15 @@ namespace DeskVR.Editor
         [MenuItem("DeskVR/⭐ 1. Cargar y Configurar Escena Limpia de DeskVR", priority = 1)]
         public static void SetupAndOpenCleanScene()
         {
-            // 1. Save whatever scene the user has open
             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
-
-            // 2. Open our clean dedicated DeskVR scene
-            var mainScene = EditorSceneManager.OpenScene(MainScenePath);
-
-            // 3. Build the workstation cleanly inside it
+            EditorSceneManager.OpenScene(MainScenePath);
             BuildWorkstation();
-
-            // 4. Set as default build scene 0
             SetSceneAsDefaultBuildScene(MainScenePath);
 
             EditorUtility.DisplayDialog(
                 "DeskVR - Escena Lista",
-                "¡Se abrió tu escena limpia 'DeskVR_Main' y se construyó la estación de trabajo sin objetos de prueba de la plantilla!\n\nAhora dale a Play ▶️ para probar con tus Quest 2.",
-                "¡Entendido!"
+                "¡Se abrió tu escena 'DeskVR_Main' y se construyó la estación completa:\n\n• Mesa y patas de oficina\n• Monitor con escritorio simulado\n• Mouse 3D físico con físicas y hápticos\n• Teclado 3D físico completo con teclas presionables\n\n¡Dale a Play ▶️ para probar con tus Quest 2!",
+                "¡Excelente!"
             );
         }
 
@@ -43,8 +36,8 @@ namespace DeskVR.Editor
             BuildWorkstation();
             EditorUtility.DisplayDialog(
                 "DeskVR",
-                "¡Estación de trabajo (Mesa, Monitor y Mouse 3D) actualizada en la escena actual!\n\nDale a Play ▶️ para probar.",
-                "¡Excelente!"
+                "¡Estación de trabajo (Mesa, Monitor, Mouse 3D y Teclado 3D) actualizada en la escena actual!\n\nDale a Play ▶️ para probar.",
+                "¡Genial!"
             );
         }
 
@@ -63,12 +56,14 @@ namespace DeskVR.Editor
             Undo.RegisterCreatedObjectUndo(root, "Build DeskVR Workstation");
             root.transform.position = Vector3.zero;
 
-            // Materials creation or color setup
+            // Materials
             Material deskMat = CreateColorMaterial("DeskMat", new Color(0.25f, 0.18f, 0.12f)); // Wood brown
             Material legMat = CreateColorMaterial("LegMat", new Color(0.12f, 0.12f, 0.14f));  // Dark metal
             Material padMat = CreateColorMaterial("PadMat", new Color(0.08f, 0.12f, 0.18f));  // Navy pad
             Material mouseMat = CreateColorMaterial("MouseMat", new Color(0.18f, 0.18f, 0.20f)); // Matte dark mouse
             Material screenBezelMat = CreateColorMaterial("BezelMat", new Color(0.05f, 0.05f, 0.05f));
+            Material keyMat = CreateColorMaterial("KeyMat", new Color(0.92f, 0.92f, 0.94f));  // Off-white keys
+            Material specialKeyMat = CreateColorMaterial("SpecialKeyMat", new Color(0.75f, 0.78f, 0.82f)); // Darker gray for enter/space
 
             // 2. Desk TableTop
             GameObject table = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -100,7 +95,7 @@ namespace DeskVR.Editor
             GameObject mousePad = GameObject.CreatePrimitive(PrimitiveType.Cube);
             mousePad.name = "Desk_MousePad";
             mousePad.transform.SetParent(root.transform);
-            mousePad.transform.position = new Vector3(0.28f, 0.741f, 0.58f);
+            mousePad.transform.position = new Vector3(0.30f, 0.741f, 0.58f);
             mousePad.transform.localScale = new Vector3(0.38f, 0.002f, 0.28f);
             mousePad.GetComponent<MeshRenderer>().sharedMaterial = padMat;
 
@@ -148,7 +143,7 @@ namespace DeskVR.Editor
             wallRect.anchorMin = Vector2.zero;
             wallRect.anchorMax = Vector2.one;
             wallRect.sizeDelta = Vector2.zero;
-            wallpaper.GetComponent<Image>().color = new Color(0.08f, 0.16f, 0.28f); // Windows Dark Blue
+            wallpaper.GetComponent<Image>().color = new Color(0.08f, 0.16f, 0.28f);
 
             // 6b. Taskbar
             GameObject taskbar = new GameObject("Taskbar", typeof(RectTransform), typeof(Image));
@@ -184,7 +179,7 @@ namespace DeskVR.Editor
             txtStart.fontSize = 24;
             txtStart.color = Color.white;
 
-            // 6c. Desktop App Icons (Test Interactive Target)
+            // 6c. Desktop App Icons
             GameObject notepadIcon = new GameObject("Icon_BlocNotas", typeof(RectTransform), typeof(Image), typeof(Button));
             notepadIcon.transform.SetParent(canvasGO.transform, false);
             RectTransform iconRect = notepadIcon.GetComponent<RectTransform>();
@@ -215,16 +210,16 @@ namespace DeskVR.Editor
             txtIcon.fontSize = 20;
             txtIcon.color = Color.white;
 
-            // 6d. Screen Cursor (2D Arrow/Pointer)
+            // 6d. Screen Cursor
             GameObject cursorGO = new GameObject("ScreenCursor", typeof(RectTransform), typeof(Image));
             cursorGO.transform.SetParent(canvasGO.transform, false);
             RectTransform cursorRect = cursorGO.GetComponent<RectTransform>();
-            cursorRect.pivot = new Vector2(0f, 1f); // Arrow tip at top-left
+            cursorRect.pivot = new Vector2(0f, 1f);
             cursorRect.sizeDelta = new Vector2(28f, 28f);
             cursorRect.anchoredPosition = Vector2.zero;
             Image curImg = cursorGO.GetComponent<Image>();
             curImg.color = Color.white;
-            curImg.raycastTarget = false; // Don't raycast self!
+            curImg.raycastTarget = false;
 
             VirtualScreenCursor screenCursor = cursorGO.AddComponent<VirtualScreenCursor>();
             SerializedObject cursorSO = new SerializedObject(screenCursor);
@@ -237,11 +232,10 @@ namespace DeskVR.Editor
             GameObject mouseGO = GameObject.CreatePrimitive(PrimitiveType.Cube);
             mouseGO.name = "VirtualMouse";
             mouseGO.transform.SetParent(root.transform);
-            mouseGO.transform.position = new Vector3(0.28f, 0.755f, 0.58f);
+            mouseGO.transform.position = new Vector3(0.30f, 0.755f, 0.58f);
             mouseGO.transform.localScale = new Vector3(0.065f, 0.030f, 0.110f);
             mouseGO.GetComponent<MeshRenderer>().sharedMaterial = mouseMat;
 
-            // Rigidbody and Grab Interactable
             Rigidbody rb = mouseGO.GetComponent<Rigidbody>();
             if (rb == null) rb = mouseGO.AddComponent<Rigidbody>();
             rb.isKinematic = true;
@@ -260,6 +254,9 @@ namespace DeskVR.Editor
             mouseSO.FindProperty("mouseSensitivity").floatValue = 1300f;
             mouseSO.ApplyModifiedProperties();
 
+            // 8. Virtual Keyboard (Physical 3D Object with full QWERTY layout)
+            BuildVirtualKeyboard(root.transform, legMat, keyMat, specialKeyMat);
+
             // Ensure EventSystem exists in the scene
             if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() == null)
             {
@@ -270,7 +267,171 @@ namespace DeskVR.Editor
             EditorSceneManager.MarkSceneDirty(activeScene);
             EditorSceneManager.SaveScene(activeScene);
 
-            Debug.Log("<color=green><b>[DeskVR]</b> ¡Estación de trabajo construida exitosamente en " + activeScene.name + "!</color>");
+            Debug.Log("<color=green><b>[DeskVR]</b> ¡Estación de trabajo completa (Mesa + Monitor + Mouse + Teclado 3D) construida!</color>");
+        }
+
+        private static void BuildVirtualKeyboard(Transform parent, Material chassisMat, Material keyMat, Material specialKeyMat)
+        {
+            GameObject kbRoot = new GameObject("VirtualKeyboard");
+            kbRoot.transform.SetParent(parent, false);
+            // Positioned in front of user, left of mouse
+            kbRoot.transform.position = new Vector3(-0.06f, 0.748f, 0.58f);
+            kbRoot.transform.rotation = Quaternion.Euler(4f, 0f, 0f);
+
+            var kbRb = kbRoot.AddComponent<Rigidbody>();
+            kbRb.isKinematic = true;
+            kbRb.useGravity = false;
+
+            kbRoot.AddComponent<VirtualKeyboardController>();
+
+            // Keyboard Chassis Base
+            GameObject chassis = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            chassis.name = "Keyboard_Chassis";
+            chassis.transform.SetParent(kbRoot.transform, false);
+            chassis.transform.localPosition = Vector3.zero;
+            chassis.transform.localScale = new Vector3(0.40f, 0.012f, 0.15f);
+            chassis.GetComponent<MeshRenderer>().sharedMaterial = chassisMat;
+
+            // Key Definitions: (Label, Value, ActionType, WidthMultiplier)
+            var row0 = new (string, string, KeyActionType, float)[]
+            {
+                ("1", "1", KeyActionType.Character, 1f),
+                ("2", "2", KeyActionType.Character, 1f),
+                ("3", "3", KeyActionType.Character, 1f),
+                ("4", "4", KeyActionType.Character, 1f),
+                ("5", "5", KeyActionType.Character, 1f),
+                ("6", "6", KeyActionType.Character, 1f),
+                ("7", "7", KeyActionType.Character, 1f),
+                ("8", "8", KeyActionType.Character, 1f),
+                ("9", "9", KeyActionType.Character, 1f),
+                ("0", "0", KeyActionType.Character, 1f),
+                ("Borrar", "", KeyActionType.Backspace, 1.8f)
+            };
+
+            var row1 = new (string, string, KeyActionType, float)[]
+            {
+                ("Q", "q", KeyActionType.Character, 1f),
+                ("W", "w", KeyActionType.Character, 1f),
+                ("E", "e", KeyActionType.Character, 1f),
+                ("R", "r", KeyActionType.Character, 1f),
+                ("T", "t", KeyActionType.Character, 1f),
+                ("Y", "y", KeyActionType.Character, 1f),
+                ("U", "u", KeyActionType.Character, 1f),
+                ("I", "i", KeyActionType.Character, 1f),
+                ("O", "o", KeyActionType.Character, 1f),
+                ("P", "p", KeyActionType.Character, 1f)
+            };
+
+            var row2 = new (string, string, KeyActionType, float)[]
+            {
+                ("A", "a", KeyActionType.Character, 1f),
+                ("S", "s", KeyActionType.Character, 1f),
+                ("D", "d", KeyActionType.Character, 1f),
+                ("F", "f", KeyActionType.Character, 1f),
+                ("G", "g", KeyActionType.Character, 1f),
+                ("H", "h", KeyActionType.Character, 1f),
+                ("J", "j", KeyActionType.Character, 1f),
+                ("K", "k", KeyActionType.Character, 1f),
+                ("L", "l", KeyActionType.Character, 1f),
+                ("Enter", "\n", KeyActionType.Enter, 1.9f)
+            };
+
+            var row3 = new (string, string, KeyActionType, float)[]
+            {
+                ("Z", "z", KeyActionType.Character, 1f),
+                ("X", "x", KeyActionType.Character, 1f),
+                ("C", "c", KeyActionType.Character, 1f),
+                ("V", "v", KeyActionType.Character, 1f),
+                ("B", "b", KeyActionType.Character, 1f),
+                ("N", "n", KeyActionType.Character, 1f),
+                ("M", "m", KeyActionType.Character, 1f),
+                (",", ",", KeyActionType.Character, 1f),
+                (".", ".", KeyActionType.Character, 1f)
+            };
+
+            var row4 = new (string, string, KeyActionType, float)[]
+            {
+                ("Espacio", " ", KeyActionType.Space, 6.2f)
+            };
+
+            var allRows = new[] { row0, row1, row2, row3, row4 };
+
+            float startZ = 0.052f;
+            float rowSpacing = 0.026f;
+            float standardKeyWidth = 0.026f;
+            float keyHeight = 0.008f;
+            float keyDepth = 0.022f;
+
+            for (int r = 0; r < allRows.Length; r++)
+            {
+                var row = allRows[r];
+                float currentZ = startZ - (r * rowSpacing);
+
+                // Calculate total width of row to center it
+                float totalRowWidth = 0f;
+                foreach (var k in row)
+                {
+                    totalRowWidth += (standardKeyWidth * k.Item4) + 0.004f;
+                }
+                float currentX = -totalRowWidth * 0.5f;
+
+                foreach (var keyDef in row)
+                {
+                    float width = standardKeyWidth * keyDef.Item4;
+                    float posX = currentX + (width * 0.5f);
+
+                    CreateKeyObject(kbRoot.transform, keyDef.Item1, keyDef.Item2, keyDef.Item3,
+                        new Vector3(posX, 0.008f, currentZ),
+                        new Vector3(width, keyHeight, keyDepth),
+                        keyDef.Item3 == KeyActionType.Character ? keyMat : specialKeyMat);
+
+                    currentX += width + 0.004f;
+                }
+            }
+        }
+
+        private static void CreateKeyObject(Transform parent, string label, string value, KeyActionType type, Vector3 localPos, Vector3 localScale, Material mat)
+        {
+            GameObject keyGO = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            keyGO.name = $"Key_{label}";
+            keyGO.transform.SetParent(parent, false);
+            keyGO.transform.localPosition = localPos;
+            keyGO.transform.localScale = localScale;
+            keyGO.GetComponent<MeshRenderer>().sharedMaterial = mat;
+
+            // Trigger collider for touch / poke detection
+            BoxCollider col = keyGO.GetComponent<BoxCollider>();
+            col.isTrigger = true;
+
+            VirtualKey vKey = keyGO.AddComponent<VirtualKey>();
+            vKey.Configure(type, value, label);
+
+            // Small Label Canvas on top of the key
+            GameObject labelCanvas = new GameObject("LabelCanvas");
+            labelCanvas.transform.SetParent(keyGO.transform, false);
+            labelCanvas.transform.localPosition = new Vector3(0f, 0.52f, 0f);
+            labelCanvas.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            labelCanvas.transform.localScale = new Vector3(0.0025f, 0.0025f, 0.0025f);
+
+            Canvas c = labelCanvas.AddComponent<Canvas>();
+            c.renderMode = RenderMode.WorldSpace;
+            RectTransform rt = labelCanvas.GetComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(100f, 80f);
+
+            GameObject textGO = new GameObject("Text");
+            textGO.transform.SetParent(labelCanvas.transform, false);
+            RectTransform textRT = textGO.AddComponent<RectTransform>();
+            textRT.anchorMin = Vector2.zero;
+            textRT.anchorMax = Vector2.one;
+            textRT.sizeDelta = Vector2.zero;
+
+            Text txt = textGO.AddComponent<Text>();
+            txt.text = label;
+            txt.alignment = TextAnchor.MiddleCenter;
+            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            txt.fontSize = label.Length > 2 ? 22 : 36;
+            txt.fontStyle = FontStyle.Bold;
+            txt.color = new Color(0.12f, 0.12f, 0.15f);
         }
 
         private static void SetSceneAsDefaultBuildScene(string scenePath)
