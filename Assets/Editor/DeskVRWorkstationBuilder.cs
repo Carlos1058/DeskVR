@@ -25,18 +25,18 @@ namespace DeskVR.Editor
 
             EditorUtility.DisplayDialog(
                 "DeskVR - Escena Lista",
-                "¡Estación completa configurada en DeskVR_Main!\n\n• Mesa y patas de oficina\n• Teclado 3D interactivo con teclas QWERTY\n• Mouse 3D físico con físicas y hápticos\n• Ventana arrastrable de Bloc de Notas en pantalla\n• Escritura en tiempo real con el teclado\n\n¡Dale a Play ▶️ para probar con tus Quest 2!",
+                "¡Estación completa y Estudio Cálido configurados en DeskVR_Main!\n\n• Habitación de estudio moderna (piso de madera, ventana, repisas)\n• Lámpara de escritorio con luz cálida y planta decorativa\n• Silla ergonómica de oficina\n• Teclado 3D interactivo con teclas QWERTY\n• Mouse 3D físico con físicas y hápticos\n• Ventana arrastrable de Bloc de Notas en pantalla\n\n¡Dale a Play ▶️ para probar con tus Quest 2!",
                 "¡Excelente!"
             );
         }
 
-        [MenuItem("DeskVR/2. Reconstruir Estación en Escena Actual", priority = 2)]
+        [MenuItem("DeskVR/2. Reconstruir Estación y Estudio en Escena Actual", priority = 2)]
         public static void BuildWorkstationMenu()
         {
             BuildWorkstation();
             EditorUtility.DisplayDialog(
                 "DeskVR",
-                "¡Estación de trabajo (Mesa, Monitor, Mouse 3D, Teclado 3D y Bloc de Notas) actualizada!\n\nDale a Play ▶️ para probar.",
+                "¡Estudio Cálido y Estación de trabajo reconstruidos con éxito!\n\nDale a Play ▶️ para probar.",
                 "¡Genial!"
             );
         }
@@ -51,19 +51,44 @@ namespace DeskVR.Editor
                 Undo.DestroyObjectImmediate(existing);
             }
 
+            // Remove any old plane floor so our room floor shines
+            var oldPlanes = GameObject.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (var go in oldPlanes)
+            {
+                if (go.name == "Plane" && go.transform.parent == null)
+                {
+                    Undo.DestroyObjectImmediate(go);
+                }
+            }
+
             // 1. Root Workstation Object
             GameObject root = new GameObject(WorkstationRootName);
             Undo.RegisterCreatedObjectUndo(root, "Build DeskVR Workstation");
             root.transform.position = Vector3.zero;
 
             // Materials
-            Material deskMat = CreateColorMaterial("DeskMat", new Color(0.25f, 0.18f, 0.12f));
-            Material legMat = CreateColorMaterial("LegMat", new Color(0.12f, 0.12f, 0.14f));
-            Material padMat = CreateColorMaterial("PadMat", new Color(0.08f, 0.12f, 0.18f));
-            Material mouseMat = CreateColorMaterial("MouseMat", new Color(0.18f, 0.18f, 0.20f));
-            Material screenBezelMat = CreateColorMaterial("BezelMat", new Color(0.05f, 0.05f, 0.05f));
-            Material keyMat = CreateColorMaterial("KeyMat", new Color(0.92f, 0.92f, 0.94f));
-            Material specialKeyMat = CreateColorMaterial("SpecialKeyMat", new Color(0.75f, 0.78f, 0.82f));
+            Material deskMat = CreateColorMaterial("DeskMat", new Color(0.28f, 0.19f, 0.13f), 0.4f);
+            Material legMat = CreateColorMaterial("LegMat", new Color(0.12f, 0.12f, 0.14f), 0.2f);
+            Material padMat = CreateColorMaterial("PadMat", new Color(0.08f, 0.12f, 0.18f), 0.1f);
+            Material mouseMat = CreateColorMaterial("MouseMat", new Color(0.18f, 0.18f, 0.20f), 0.3f);
+            Material screenBezelMat = CreateColorMaterial("BezelMat", new Color(0.05f, 0.05f, 0.05f), 0.2f);
+            Material keyMat = CreateColorMaterial("KeyMat", new Color(0.92f, 0.92f, 0.94f), 0.2f);
+            Material specialKeyMat = CreateColorMaterial("SpecialKeyMat", new Color(0.75f, 0.78f, 0.82f), 0.2f);
+
+            // Room Materials
+            Material floorWoodMat = CreateColorMaterial("FloorWoodMat", new Color(0.48f, 0.33f, 0.22f), 0.45f);
+            Material rugMat = CreateColorMaterial("RugMat", new Color(0.72f, 0.75f, 0.78f), 0.05f);
+            Material wallMat = CreateColorMaterial("WallPaintMat", new Color(0.92f, 0.90f, 0.86f), 0.05f);
+            Material baseboardMat = CreateColorMaterial("BaseboardMat", new Color(0.28f, 0.19f, 0.13f), 0.3f);
+            Material ceilingMat = CreateColorMaterial("CeilingMat", new Color(0.97f, 0.97f, 0.97f), 0.05f);
+            Material windowFrameMat = CreateColorMaterial("WindowFrameMat", new Color(0.15f, 0.16f, 0.18f), 0.3f);
+            Material chairFabricMat = CreateColorMaterial("ChairFabricMat", new Color(0.18f, 0.20f, 0.24f), 0.1f);
+            Material plantPotMat = CreateColorMaterial("PlantPotMat", new Color(0.95f, 0.95f, 0.96f), 0.5f);
+            Material plantLeafMat = CreateColorMaterial("PlantLeafMat", new Color(0.22f, 0.55f, 0.24f), 0.3f);
+            Material lampMat = CreateColorMaterial("LampMetalMat", new Color(0.85f, 0.70f, 0.35f), 0.6f); // Warm brass lamp
+
+            // Build Cozy Study Room Environment
+            BuildCozyRoomEnvironment(root.transform, floorWoodMat, rugMat, wallMat, baseboardMat, ceilingMat, windowFrameMat, chairFabricMat, plantPotMat, plantLeafMat, lampMat);
 
             // 2. Desk TableTop
             GameObject table = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -210,10 +235,10 @@ namespace DeskVR.Editor
             txtIcon.fontSize = 20;
             txtIcon.color = Color.white;
 
-            // 6d. Notepad Window (Interactive Simulated App)
+            // 6d. Notepad Window
             BuildNotepadWindow(canvasGO.transform, iconBtn);
 
-            // 6e. Screen Cursor (Top layer so it renders above windows)
+            // 6e. Screen Cursor
             GameObject cursorGO = new GameObject("ScreenCursor", typeof(RectTransform), typeof(Image));
             cursorGO.transform.SetParent(canvasGO.transform, false);
             RectTransform cursorRect = cursorGO.GetComponent<RectTransform>();
@@ -231,7 +256,7 @@ namespace DeskVR.Editor
             cursorSO.FindProperty("raycaster").objectReferenceValue = raycaster;
             cursorSO.ApplyModifiedProperties();
 
-            // 7. Virtual Mouse (Physical 3D Object on table)
+            // 7. Virtual Mouse
             GameObject mouseGO = GameObject.CreatePrimitive(PrimitiveType.Cube);
             mouseGO.name = "VirtualMouse";
             mouseGO.transform.SetParent(root.transform);
@@ -257,8 +282,11 @@ namespace DeskVR.Editor
             mouseSO.FindProperty("mouseSensitivity").floatValue = 1300f;
             mouseSO.ApplyModifiedProperties();
 
-            // 8. Virtual Keyboard (Physical 3D Object with full QWERTY layout)
+            // 8. Virtual Keyboard
             BuildVirtualKeyboard(root.transform, legMat, keyMat, specialKeyMat);
+
+            // Lighting Setup (Natural Warm Daylight)
+            ConfigureLighting();
 
             // Ensure EventSystem exists in the scene
             if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() == null)
@@ -270,7 +298,291 @@ namespace DeskVR.Editor
             EditorSceneManager.MarkSceneDirty(activeScene);
             EditorSceneManager.SaveScene(activeScene);
 
-            Debug.Log("<color=green><b>[DeskVR]</b> ¡Estación de trabajo completa (Mesa + Monitor + Mouse + Teclado 3D + Bloc de Notas) construida!</color>");
+            Debug.Log("<color=green><b>[DeskVR]</b> ¡Estudio Cálido y Estación de trabajo construidos exitosamente!</color>");
+        }
+
+        private static void BuildCozyRoomEnvironment(Transform parent, Material floorMat, Material rugMat, Material wallMat, Material baseboardMat, Material ceilingMat, Material windowFrameMat, Material chairFabricMat, Material plantPotMat, Material plantLeafMat, Material lampMat)
+        {
+            GameObject room = new GameObject("Room_Environment");
+            room.transform.SetParent(parent, false);
+
+            // 1. Warm Wood Floor
+            GameObject floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            floor.name = "Room_Floor";
+            floor.transform.SetParent(room.transform, false);
+            floor.transform.position = new Vector3(0f, -0.015f, 0.40f);
+            floor.transform.localScale = new Vector3(4.60f, 0.03f, 4.60f);
+            floor.GetComponent<MeshRenderer>().sharedMaterial = floorMat;
+
+            // 2. Cozy Carpet / Rug under Desk
+            GameObject rug = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            rug.name = "Room_Rug";
+            rug.transform.SetParent(room.transform, false);
+            rug.transform.position = new Vector3(0f, 0.002f, 0.50f);
+            rug.transform.localScale = new Vector3(2.20f, 0.003f, 2.00f);
+            rug.GetComponent<MeshRenderer>().sharedMaterial = rugMat;
+
+            // 3. Walls (Room bounds: X: -2.3 to 2.3, Z: -1.9 to 2.7, Y: 0 to 2.8)
+            // Back Wall (Behind monitor)
+            GameObject backWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            backWall.name = "Wall_Back";
+            backWall.transform.SetParent(room.transform, false);
+            backWall.transform.position = new Vector3(0f, 1.40f, 2.65f);
+            backWall.transform.localScale = new Vector3(4.60f, 2.80f, 0.10f);
+            backWall.GetComponent<MeshRenderer>().sharedMaterial = wallMat;
+
+            // Wall Behind User
+            GameObject frontWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            frontWall.name = "Wall_BehindUser";
+            frontWall.transform.SetParent(room.transform, false);
+            frontWall.transform.position = new Vector3(0f, 1.40f, -1.85f);
+            frontWall.transform.localScale = new Vector3(4.60f, 2.80f, 0.10f);
+            frontWall.GetComponent<MeshRenderer>().sharedMaterial = wallMat;
+
+            // Right Wall
+            GameObject rightWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            rightWall.name = "Wall_Right";
+            rightWall.transform.SetParent(room.transform, false);
+            rightWall.transform.position = new Vector3(2.25f, 1.40f, 0.40f);
+            rightWall.transform.localScale = new Vector3(0.10f, 2.80f, 4.60f);
+            rightWall.GetComponent<MeshRenderer>().sharedMaterial = wallMat;
+
+            // Left Wall with Big Daylight Window
+            GameObject leftWallBottom = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            leftWallBottom.name = "Wall_Left_Bottom";
+            leftWallBottom.transform.SetParent(room.transform, false);
+            leftWallBottom.transform.position = new Vector3(-2.25f, 0.45f, 0.40f);
+            leftWallBottom.transform.localScale = new Vector3(0.10f, 0.90f, 4.60f);
+            leftWallBottom.GetComponent<MeshRenderer>().sharedMaterial = wallMat;
+
+            GameObject leftWallTop = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            leftWallTop.name = "Wall_Left_Top";
+            leftWallTop.transform.SetParent(room.transform, false);
+            leftWallTop.transform.position = new Vector3(-2.25f, 2.45f, 0.40f);
+            leftWallTop.transform.localScale = new Vector3(0.10f, 0.70f, 4.60f);
+            leftWallTop.GetComponent<MeshRenderer>().sharedMaterial = wallMat;
+
+            GameObject leftWallSideA = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            leftWallSideA.name = "Wall_Left_SideA";
+            leftWallSideA.transform.SetParent(room.transform, false);
+            leftWallSideA.transform.position = new Vector3(-2.25f, 1.45f, -1.15f);
+            leftWallSideA.transform.localScale = new Vector3(0.10f, 1.30f, 1.50f);
+            leftWallSideA.GetComponent<MeshRenderer>().sharedMaterial = wallMat;
+
+            GameObject leftWallSideB = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            leftWallSideB.name = "Wall_Left_SideB";
+            leftWallSideB.transform.SetParent(room.transform, false);
+            leftWallSideB.transform.position = new Vector3(-2.25f, 1.45f, 1.95f);
+            leftWallSideB.transform.localScale = new Vector3(0.10f, 1.30f, 1.50f);
+            leftWallSideB.GetComponent<MeshRenderer>().sharedMaterial = wallMat;
+
+            // Window Frame & Glass
+            GameObject winFrame = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            winFrame.name = "Window_Frame";
+            winFrame.transform.SetParent(room.transform, false);
+            winFrame.transform.position = new Vector3(-2.24f, 1.45f, 0.40f);
+            winFrame.transform.localScale = new Vector3(0.08f, 1.25f, 1.70f);
+            winFrame.GetComponent<MeshRenderer>().sharedMaterial = windowFrameMat;
+
+            // Sky / Vista Plane outside window
+            GameObject skyVista = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            skyVista.name = "Window_SkyVista";
+            skyVista.transform.SetParent(room.transform, false);
+            skyVista.transform.position = new Vector3(-2.35f, 1.50f, 0.40f);
+            skyVista.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
+            skyVista.transform.localScale = new Vector3(2.5f, 1.8f, 1f);
+            Material skyVistaMat = CreateColorMaterial("SkyVistaMat", new Color(0.72f, 0.88f, 0.98f), 0.1f);
+            skyVista.GetComponent<MeshRenderer>().sharedMaterial = skyVistaMat;
+            UnityEngine.Object.DestroyImmediate(skyVista.GetComponent<Collider>());
+
+            // Baseboards (Zócalos)
+            CreateBaseboard(room.transform, new Vector3(0f, 0.05f, 2.59f), new Vector3(4.5f, 0.10f, 0.02f), baseboardMat);
+            CreateBaseboard(room.transform, new Vector3(2.19f, 0.05f, 0.40f), new Vector3(0.02f, 0.10f, 4.5f), baseboardMat);
+
+            // 4. Ceiling & Soft Ambient Light
+            GameObject ceiling = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            ceiling.name = "Room_Ceiling";
+            ceiling.transform.SetParent(room.transform, false);
+            ceiling.transform.position = new Vector3(0f, 2.81f, 0.40f);
+            ceiling.transform.localScale = new Vector3(4.60f, 0.02f, 4.60f);
+            ceiling.GetComponent<MeshRenderer>().sharedMaterial = ceilingMat;
+
+            GameObject ceilingLightGO = new GameObject("Ceiling_AmbientPointLight");
+            ceilingLightGO.transform.SetParent(room.transform, false);
+            ceilingLightGO.transform.position = new Vector3(0f, 2.65f, 0.50f);
+            Light ceilingLight = ceilingLightGO.AddComponent<Light>();
+            ceilingLight.type = LightType.Point;
+            ceilingLight.color = new Color(1.0f, 0.94f, 0.86f);
+            ceilingLight.intensity = 0.85f;
+            ceilingLight.range = 7.5f;
+
+            // 5. Desk Lamp (with warm focused light)
+            BuildDeskLamp(room.transform, lampMat);
+
+            // 6. Succulent Plant on Desk
+            BuildDeskPlant(room.transform, plantPotMat, plantLeafMat);
+
+            // 7. Floating Shelf on Back Wall (with books & art)
+            BuildWallShelf(room.transform, baseboardMat);
+
+            // 8. Ergonomic Office Chair
+            BuildOfficeChair(room.transform, chairFabricMat, legMat);
+        }
+
+        private static void CreateBaseboard(Transform parent, Vector3 pos, Vector3 scale, Material mat)
+        {
+            GameObject bb = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            bb.name = "Baseboard";
+            bb.transform.SetParent(parent, false);
+            bb.transform.position = pos;
+            bb.transform.localScale = scale;
+            bb.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        }
+
+        private static void BuildDeskLamp(Transform parent, Material lampMat)
+        {
+            GameObject lampRoot = new GameObject("Desk_Lamp");
+            lampRoot.transform.SetParent(parent, false);
+            lampRoot.transform.position = new Vector3(-0.52f, 0.742f, 0.88f);
+
+            // Base
+            GameObject lampBase = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            lampBase.transform.SetParent(lampRoot.transform, false);
+            lampBase.transform.localPosition = Vector3.zero;
+            lampBase.transform.localScale = new Vector3(0.12f, 0.008f, 0.12f);
+            lampBase.GetComponent<MeshRenderer>().sharedMaterial = lampMat;
+
+            // Stem / Arm
+            GameObject stem = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            stem.transform.SetParent(lampRoot.transform, false);
+            stem.transform.localPosition = new Vector3(0f, 0.18f, 0f);
+            stem.transform.localScale = new Vector3(0.015f, 0.18f, 0.015f);
+            stem.GetComponent<MeshRenderer>().sharedMaterial = lampMat;
+
+            // Lamp Shade / Head angled to desk
+            GameObject shade = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            shade.transform.SetParent(lampRoot.transform, false);
+            shade.transform.localPosition = new Vector3(0.08f, 0.35f, -0.06f);
+            shade.transform.localRotation = Quaternion.Euler(35f, -40f, 0f);
+            shade.transform.localScale = new Vector3(0.10f, 0.06f, 0.10f);
+            shade.GetComponent<MeshRenderer>().sharedMaterial = lampMat;
+
+            // Warm Cozy Point Light
+            GameObject lightGO = new GameObject("Lamp_WarmLight");
+            lightGO.transform.SetParent(shade.transform, false);
+            lightGO.transform.localPosition = new Vector3(0f, -0.04f, 0f);
+            Light pLight = lightGO.AddComponent<Light>();
+            pLight.type = LightType.Point;
+            pLight.color = new Color(1.0f, 0.88f, 0.72f);
+            pLight.intensity = 1.2f;
+            pLight.range = 1.6f;
+        }
+
+        private static void BuildDeskPlant(Transform parent, Material potMat, Material leafMat)
+        {
+            GameObject plantRoot = new GameObject("Desk_Plant_Succulent");
+            plantRoot.transform.SetParent(parent, false);
+            plantRoot.transform.position = new Vector3(0.54f, 0.742f, 0.88f);
+
+            // Ceramic Pot
+            GameObject pot = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            pot.transform.SetParent(plantRoot.transform, false);
+            pot.transform.localPosition = new Vector3(0f, 0.04f, 0f);
+            pot.transform.localScale = new Vector3(0.09f, 0.04f, 0.09f);
+            pot.GetComponent<MeshRenderer>().sharedMaterial = potMat;
+
+            // Succulent Leaves (geometric layered)
+            for (int i = 0; i < 6; i++)
+            {
+                float angle = i * 60f;
+                GameObject leaf = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                leaf.name = $"Leaf_{i}";
+                leaf.transform.SetParent(plantRoot.transform, false);
+                leaf.transform.localPosition = new Vector3(Mathf.Sin(angle * Mathf.Deg2Rad) * 0.025f, 0.085f, Mathf.Cos(angle * Mathf.Deg2Rad) * 0.025f);
+                leaf.transform.localRotation = Quaternion.Euler(20f, angle, 0f);
+                leaf.transform.localScale = new Vector3(0.035f, 0.015f, 0.06f);
+                leaf.GetComponent<MeshRenderer>().sharedMaterial = leafMat;
+            }
+        }
+
+        private static void BuildWallShelf(Transform parent, Material woodMat)
+        {
+            GameObject shelf = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            shelf.name = "Wall_Shelf";
+            shelf.transform.SetParent(parent, false);
+            shelf.transform.position = new Vector3(0f, 1.85f, 2.58f);
+            shelf.transform.localScale = new Vector3(1.30f, 0.03f, 0.22f);
+            shelf.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
+
+            // Decorative books on shelf
+            Material bookMat1 = CreateColorMaterial("BookBlueMat", new Color(0.18f, 0.35f, 0.65f), 0.2f);
+            Material bookMat2 = CreateColorMaterial("BookRedMat", new Color(0.68f, 0.22f, 0.20f), 0.2f);
+
+            GameObject book1 = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            book1.name = "Book_1";
+            book1.transform.SetParent(shelf.transform, false);
+            book1.transform.localPosition = new Vector3(-0.30f, 3.5f, 0f);
+            book1.transform.localScale = new Vector3(0.06f, 5.5f, 0.7f);
+            book1.GetComponent<MeshRenderer>().sharedMaterial = bookMat1;
+
+            GameObject book2 = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            book2.name = "Book_2";
+            book2.transform.SetParent(shelf.transform, false);
+            book2.transform.localPosition = new Vector3(-0.22f, 3.2f, 0f);
+            book2.transform.localScale = new Vector3(0.05f, 4.8f, 0.68f);
+            book2.GetComponent<MeshRenderer>().sharedMaterial = bookMat2;
+        }
+
+        private static void BuildOfficeChair(Transform parent, Material fabricMat, Material metalMat)
+        {
+            GameObject chairRoot = new GameObject("OfficeChair");
+            chairRoot.transform.SetParent(parent, false);
+            chairRoot.transform.position = new Vector3(0f, 0f, 0.12f);
+
+            // Star base
+            GameObject baseCenter = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            baseCenter.name = "Chair_Base";
+            baseCenter.transform.SetParent(chairRoot.transform, false);
+            baseCenter.transform.localPosition = new Vector3(0f, 0.06f, 0f);
+            baseCenter.transform.localScale = new Vector3(0.50f, 0.02f, 0.50f);
+            baseCenter.GetComponent<MeshRenderer>().sharedMaterial = metalMat;
+
+            // Hydraulic Piston
+            GameObject piston = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            piston.name = "Chair_Piston";
+            piston.transform.SetParent(chairRoot.transform, false);
+            piston.transform.localPosition = new Vector3(0f, 0.25f, 0f);
+            piston.transform.localScale = new Vector3(0.06f, 0.20f, 0.06f);
+            piston.GetComponent<MeshRenderer>().sharedMaterial = metalMat;
+
+            // Seat Cushion
+            GameObject seat = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            seat.name = "Chair_Seat";
+            seat.transform.SetParent(chairRoot.transform, false);
+            seat.transform.localPosition = new Vector3(0f, 0.44f, 0f);
+            seat.transform.localScale = new Vector3(0.48f, 0.07f, 0.46f);
+            seat.GetComponent<MeshRenderer>().sharedMaterial = fabricMat;
+
+            // Backrest
+            GameObject backrest = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            backrest.name = "Chair_Backrest";
+            backrest.transform.SetParent(chairRoot.transform, false);
+            backrest.transform.localPosition = new Vector3(0f, 0.72f, -0.22f);
+            backrest.transform.localRotation = Quaternion.Euler(-5f, 0f, 0f);
+            backrest.transform.localScale = new Vector3(0.44f, 0.52f, 0.06f);
+            backrest.GetComponent<MeshRenderer>().sharedMaterial = fabricMat;
+        }
+
+        private static void ConfigureLighting()
+        {
+            Light dirLight = UnityEngine.Object.FindFirstObjectByType<Light>();
+            if (dirLight != null && dirLight.type == LightType.Directional)
+            {
+                dirLight.transform.rotation = Quaternion.Euler(32f, 50f, 0f); // Angles sunlight from window
+                dirLight.color = new Color(1.0f, 0.96f, 0.90f);
+                dirLight.intensity = 1.15f;
+                dirLight.shadows = LightShadows.Soft;
+            }
         }
 
         private static void BuildNotepadWindow(Transform canvasTransform, Button triggerIconBtn)
@@ -287,7 +599,6 @@ namespace DeskVR.Editor
 
             VirtualWindow vWin = winGO.AddComponent<VirtualWindow>();
 
-            // Title Bar (Draggable handle)
             GameObject titleBar = new GameObject("TitleBar", typeof(RectTransform), typeof(Image));
             titleBar.transform.SetParent(winGO.transform, false);
             RectTransform titleRect = titleBar.GetComponent<RectTransform>();
@@ -297,7 +608,6 @@ namespace DeskVR.Editor
             titleRect.sizeDelta = new Vector2(0f, 44f);
             titleBar.GetComponent<Image>().color = new Color(0.14f, 0.18f, 0.26f);
 
-            // Title Text
             GameObject titleTextGO = new GameObject("TitleText", typeof(RectTransform), typeof(Text));
             titleTextGO.transform.SetParent(titleBar.transform, false);
             RectTransform ttRect = titleTextGO.GetComponent<RectTransform>();
@@ -313,7 +623,6 @@ namespace DeskVR.Editor
             tt.fontStyle = FontStyle.Bold;
             tt.color = Color.white;
 
-            // Close Button [X]
             GameObject closeBtnGO = new GameObject("Btn_Close", typeof(RectTransform), typeof(Image), typeof(Button));
             closeBtnGO.transform.SetParent(titleBar.transform, false);
             RectTransform cbRect = closeBtnGO.GetComponent<RectTransform>();
@@ -338,7 +647,6 @@ namespace DeskVR.Editor
             ct.fontSize = 20;
             ct.color = Color.white;
 
-            // Content Text Area (White Page)
             GameObject contentArea = new GameObject("ContentArea", typeof(RectTransform), typeof(Image));
             contentArea.transform.SetParent(winGO.transform, false);
             RectTransform caRect = contentArea.GetComponent<RectTransform>();
@@ -348,7 +656,6 @@ namespace DeskVR.Editor
             caRect.offsetMax = new Vector2(-12f, -50f);
             contentArea.GetComponent<Image>().color = Color.white;
 
-            // Text Display
             GameObject textGO = new GameObject("DisplayText", typeof(RectTransform), typeof(Text));
             textGO.transform.SetParent(contentArea.transform, false);
             RectTransform textRect = textGO.GetComponent<RectTransform>();
@@ -363,7 +670,6 @@ namespace DeskVR.Editor
             displayText.fontSize = 24;
             displayText.color = new Color(0.1f, 0.12f, 0.16f);
 
-            // Placeholder Text
             GameObject phGO = new GameObject("Placeholder", typeof(RectTransform), typeof(Text));
             phGO.transform.SetParent(contentArea.transform, false);
             RectTransform phRect = phGO.GetComponent<RectTransform>();
@@ -379,7 +685,6 @@ namespace DeskVR.Editor
             phText.fontStyle = FontStyle.Italic;
             phText.color = new Color(0.55f, 0.60f, 0.68f);
 
-            // Attach TextEditorApp
             TextEditorApp editorApp = contentArea.AddComponent<TextEditorApp>();
             SerializedObject editorSO = new SerializedObject(editorApp);
             editorSO.FindProperty("contentText").objectReferenceValue = displayText;
@@ -387,7 +692,6 @@ namespace DeskVR.Editor
             editorSO.FindProperty("parentWindow").objectReferenceValue = vWin;
             editorSO.ApplyModifiedProperties();
 
-            // Link VirtualWindow serialized properties
             SerializedObject winSO = new SerializedObject(vWin);
             winSO.FindProperty("windowTitle").stringValue = "Bloc de Notas";
             winSO.FindProperty("windowRect").objectReferenceValue = winRect;
@@ -396,13 +700,11 @@ namespace DeskVR.Editor
             winSO.FindProperty("closeButton").objectReferenceValue = closeBtn;
             winSO.ApplyModifiedProperties();
 
-            // Link desktop icon click to open window
             if (triggerIconBtn != null)
             {
                 UnityEditor.Events.UnityEventTools.AddPersistentListener(triggerIconBtn.onClick, vWin.Open);
             }
 
-            // Start with window open so it is immediately usable
             vWin.Open();
         }
 
@@ -419,7 +721,6 @@ namespace DeskVR.Editor
 
             kbRoot.AddComponent<VirtualKeyboardController>();
 
-            // Keyboard Chassis Base
             GameObject chassis = GameObject.CreatePrimitive(PrimitiveType.Cube);
             chassis.name = "Keyboard_Chassis";
             chassis.transform.SetParent(kbRoot.transform, false);
@@ -427,7 +728,6 @@ namespace DeskVR.Editor
             chassis.transform.localScale = new Vector3(0.40f, 0.012f, 0.15f);
             chassis.GetComponent<MeshRenderer>().sharedMaterial = chassisMat;
 
-            // Key Definitions: (Label, Value, ActionType, WidthMultiplier)
             var row0 = new (string, string, KeyActionType, float)[]
             {
                 ("1", "1", KeyActionType.Character, 1f),
@@ -575,7 +875,7 @@ namespace DeskVR.Editor
             EditorBuildSettings.scenes = scenes;
         }
 
-        private static Material CreateColorMaterial(string matName, Color color)
+        private static Material CreateColorMaterial(string matName, Color color, float smoothness = 0.35f)
         {
             string folder = "Assets/_Project/Materials";
             if (!AssetDatabase.IsValidFolder(folder))
@@ -584,14 +884,19 @@ namespace DeskVR.Editor
             }
             string path = $"{folder}/{matName}.mat";
             Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (existing != null) return existing;
+            if (existing != null)
+            {
+                existing.color = color;
+                existing.SetFloat("_Smoothness", smoothness);
+                return existing;
+            }
 
             Shader urpLit = Shader.Find("Universal Render Pipeline/Lit");
             if (urpLit == null) urpLit = Shader.Find("Standard");
 
             Material mat = new Material(urpLit);
             mat.color = color;
-            mat.SetFloat("_Smoothness", 0.35f);
+            mat.SetFloat("_Smoothness", smoothness);
 
             AssetDatabase.CreateAsset(mat, path);
             AssetDatabase.SaveAssets();
