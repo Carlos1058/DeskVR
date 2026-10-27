@@ -42,6 +42,8 @@ namespace DeskVR.Peripherals
 
         // Static events for the simulated OS and Curriculum modules
         public static event Action<Vector2> OnMouseMoved;
+        public static event Action OnLeftClickDown;
+        public static event Action OnLeftClickUp;
         public static event Action OnLeftClick;
         public static event Action OnRightClick;
         public static event Action<bool> OnGrabStateChanged;
@@ -49,9 +51,11 @@ namespace DeskVR.Peripherals
         private XRGrabInteractable grabInteractable;
         private Vector3 lastPosition;
         private bool isHeld = false;
+        private bool isLeftClickPressed = false;
         private IXRSelectInteractor currentInteractor;
 
         public bool IsHeld => isHeld;
+        public bool IsLeftClickPressed => isLeftClickPressed;
 
         private void Awake()
         {
@@ -60,7 +64,8 @@ namespace DeskVR.Peripherals
             {
                 grabInteractable.selectEntered.AddListener(OnGrabbed);
                 grabInteractable.selectExited.AddListener(OnReleased);
-                grabInteractable.activated.AddListener(OnActivated); // Trigger click when grabbed
+                grabInteractable.activated.AddListener(OnActivated);
+                grabInteractable.deactivated.AddListener(OnDeactivated);
             }
         }
 
@@ -94,24 +99,35 @@ namespace DeskVR.Peripherals
         private void OnReleased(SelectExitEventArgs args)
         {
             isHeld = false;
+            if (isLeftClickPressed)
+            {
+                OnDeactivated(null);
+            }
             currentInteractor = null;
             ClampToDesk();
             OnGrabStateChanged?.Invoke(false);
         }
 
-        /// <summary>
-        /// Triggered when the user presses the primary trigger button while holding the mouse.
-        /// Acts as the primary Left Click.
-        /// </summary>
         private void OnActivated(ActivateEventArgs args)
         {
-            PerformLeftClick();
+            isLeftClickPressed = true;
+            TriggerHaptic(clickHapticAmplitude, clickHapticDuration);
+            OnLeftClickDown?.Invoke();
+            OnLeftClick?.Invoke();
+        }
+
+        private void OnDeactivated(DeactivateEventArgs args)
+        {
+            isLeftClickPressed = false;
+            OnLeftClickUp?.Invoke();
         }
 
         public void PerformLeftClick()
         {
             TriggerHaptic(clickHapticAmplitude, clickHapticDuration);
+            OnLeftClickDown?.Invoke();
             OnLeftClick?.Invoke();
+            OnLeftClickUp?.Invoke();
         }
 
         public void PerformRightClick()
@@ -127,10 +143,8 @@ namespace DeskVR.Peripherals
             Vector3 currentPos = transform.position;
             Vector3 deskPos = deskSurface.position;
 
-            // Constrain Y strictly to the table top
             currentPos.y = deskPos.y + heightOffset;
 
-            // Clamp X and Z within the desk bounds
             float halfWidth = deskAreaSize.x * 0.5f;
             float halfDepth = deskAreaSize.y * 0.5f;
 
@@ -152,8 +166,6 @@ namespace DeskVR.Peripherals
 
             if (diff.sqrMagnitude > 0.0000005f)
             {
-                // In Unity 3D world: X is horizontal, Z is forward/backward
-                // Desk reference rotation mapping
                 Vector3 localDiff = deskSurface != null ? deskSurface.InverseTransformDirection(diff) : diff;
                 Vector2 screenDelta = new Vector2(localDiff.x, localDiff.z) * mouseSensitivity;
 
@@ -177,6 +189,7 @@ namespace DeskVR.Peripherals
                 grabInteractable.selectEntered.RemoveListener(OnGrabbed);
                 grabInteractable.selectExited.RemoveListener(OnReleased);
                 grabInteractable.activated.RemoveListener(OnActivated);
+                grabInteractable.deactivated.RemoveListener(OnDeactivated);
             }
         }
 

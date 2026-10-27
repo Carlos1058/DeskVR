@@ -25,6 +25,7 @@ namespace DeskVR.OS
         private PointerEventData pointerData;
         private GameObject currentHoveredObject;
         private GameObject currentPressedObject;
+        private bool isDragging = false;
 
         private void Awake()
         {
@@ -37,13 +38,17 @@ namespace DeskVR.OS
         private void OnEnable()
         {
             VirtualMouseController.OnMouseMoved += HandleMouseMoved;
-            VirtualMouseController.OnLeftClick += HandleLeftClick;
+            VirtualMouseController.OnLeftClickDown += HandleLeftClickDown;
+            VirtualMouseController.OnLeftClickUp += HandleLeftClickUp;
+            VirtualMouseController.OnLeftClick += HandleInstantClick;
         }
 
         private void OnDisable()
         {
             VirtualMouseController.OnMouseMoved -= HandleMouseMoved;
-            VirtualMouseController.OnLeftClick -= HandleLeftClick;
+            VirtualMouseController.OnLeftClickDown -= HandleLeftClickDown;
+            VirtualMouseController.OnLeftClickUp -= HandleLeftClickUp;
+            VirtualMouseController.OnLeftClick -= HandleInstantClick;
         }
 
         private void Start()
@@ -71,14 +76,30 @@ namespace DeskVR.OS
 
             cursorRect.anchoredPosition = pos;
 
-            UpdateHover();
+            if (pointerData == null) pointerData = new PointerEventData(eventSystem);
+            pointerData.position = RectTransformUtility.WorldToScreenPoint(Camera.main, cursorRect.position);
+            pointerData.delta = delta;
+
+            if (currentPressedObject != null)
+            {
+                if (!isDragging)
+                {
+                    isDragging = true;
+                    ExecuteEvents.Execute(currentPressedObject, pointerData, ExecuteEvents.beginDragHandler);
+                }
+                ExecuteEvents.Execute(currentPressedObject, pointerData, ExecuteEvents.dragHandler);
+            }
+            else
+            {
+                UpdateHover();
+            }
         }
 
         private void UpdateHover()
         {
             if (raycaster == null || eventSystem == null) return;
 
-            // Convert world position of cursor to screen raycast
+            if (pointerData == null) pointerData = new PointerEventData(eventSystem);
             pointerData.position = RectTransformUtility.WorldToScreenPoint(Camera.main, cursorRect.position);
             var results = new List<RaycastResult>();
             raycaster.Raycast(pointerData, results);
@@ -99,22 +120,50 @@ namespace DeskVR.OS
             }
         }
 
-        private void HandleLeftClick()
+        private void HandleLeftClickDown()
         {
             if (raycaster == null || eventSystem == null) return;
 
+            if (pointerData == null) pointerData = new PointerEventData(eventSystem);
             pointerData.position = RectTransformUtility.WorldToScreenPoint(Camera.main, cursorRect.position);
             var results = new List<RaycastResult>();
             raycaster.Raycast(pointerData, results);
 
             if (results.Count > 0)
             {
-                GameObject target = results[0].gameObject;
+                currentPressedObject = results[0].gameObject;
+                pointerData.pointerPressRaycast = results[0];
+                pointerData.pressPosition = pointerData.position;
+                pointerData.rawPointerPress = currentPressedObject;
 
-                // Simulate PointerDown and Click
-                ExecuteEvents.Execute(target, pointerData, ExecuteEvents.pointerDownHandler);
-                ExecuteEvents.Execute(target, pointerData, ExecuteEvents.pointerClickHandler);
-                ExecuteEvents.Execute(target, pointerData, ExecuteEvents.pointerUpHandler);
+                ExecuteEvents.Execute(currentPressedObject, pointerData, ExecuteEvents.pointerDownHandler);
+            }
+        }
+
+        private void HandleLeftClickUp()
+        {
+            if (currentPressedObject != null)
+            {
+                if (isDragging)
+                {
+                    ExecuteEvents.Execute(currentPressedObject, pointerData, ExecuteEvents.endDragHandler);
+                    isDragging = false;
+                }
+
+                ExecuteEvents.Execute(currentPressedObject, pointerData, ExecuteEvents.pointerUpHandler);
+                ExecuteEvents.Execute(currentPressedObject, pointerData, ExecuteEvents.pointerClickHandler);
+                currentPressedObject = null;
+            }
+            UpdateHover();
+        }
+
+        private void HandleInstantClick()
+        {
+            // Fallback for click events if Down/Up was not paired
+            if (currentPressedObject == null)
+            {
+                HandleLeftClickDown();
+                HandleLeftClickUp();
             }
         }
     }
