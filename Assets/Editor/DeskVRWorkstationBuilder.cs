@@ -426,7 +426,7 @@ namespace DeskVR.Editor
             BuildWallShelf(room.transform, baseboardMat);
 
             // 8. Ergonomic Office Chair
-            BuildOfficeChair(room.transform, chairFabricMat, legMat);
+            BuildOfficeChair(room.transform, chairFabricMat, windowFrameMat);
         }
 
         private static void CreateBaseboard(Transform parent, Vector3 pos, Vector3 scale, Material mat)
