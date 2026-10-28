@@ -25,7 +25,7 @@ namespace DeskVR.Editor
 
             EditorUtility.DisplayDialog(
                 "DeskVR - Escena Lista",
-                "¡Estación completa y Estudio Cálido configurados en DeskVR_Main!\n\n• Habitación de estudio moderna (piso de madera, ventana, repisas)\n• Lámpara de escritorio con luz cálida y planta decorativa\n• Silla ergonómica de oficina\n• Teclado 3D interactivo con teclas QWERTY\n• Mouse 3D físico con físicas y hápticos\n• Ventana arrastrable de Bloc de Notas en pantalla\n\n¡Dale a Play ▶️ para probar con tus Quest 2!",
+                "¡Estación completa y Estudio Luminoso configurados en DeskVR_Main!\n\n• Habitación de estudio moderna bien iluminada (4 focos de techo + lámpara)\n• Piso de madera cálida, ventana con luz de día y repisa\n• Teclado 3D interactivo con teclas QWERTY\n• Mouse 3D físico con físicas y hápticos\n• Ventana arrastrable de Bloc de Notas en pantalla\n• Sin silla que estorbe al usuario\n\n¡Dale a Play ▶️ para probar con tus Quest 2!",
                 "¡Excelente!"
             );
         }
@@ -36,7 +36,7 @@ namespace DeskVR.Editor
             BuildWorkstation();
             EditorUtility.DisplayDialog(
                 "DeskVR",
-                "¡Estudio Cálido y Estación de trabajo reconstruidos con éxito!\n\nDale a Play ▶️ para probar.",
+                "¡Estudio Luminoso y Estación de trabajo reconstruidos con éxito!\n\nDale a Play ▶️ para probar.",
                 "¡Genial!"
             );
         }
@@ -67,7 +67,7 @@ namespace DeskVR.Editor
             root.transform.position = Vector3.zero;
 
             // Materials
-            Material deskMat = CreateColorMaterial("DeskMat", new Color(0.28f, 0.19f, 0.13f), 0.4f);
+            Material deskMat = CreateColorMaterial("DeskMat", new Color(0.32f, 0.22f, 0.15f), 0.4f);
             Material legMat = CreateColorMaterial("LegMat", new Color(0.12f, 0.12f, 0.14f), 0.2f);
             Material padMat = CreateColorMaterial("PadMat", new Color(0.08f, 0.12f, 0.18f), 0.1f);
             Material mouseMat = CreateColorMaterial("MouseMat", new Color(0.18f, 0.18f, 0.20f), 0.3f);
@@ -75,20 +75,19 @@ namespace DeskVR.Editor
             Material keyMat = CreateColorMaterial("KeyMat", new Color(0.92f, 0.92f, 0.94f), 0.2f);
             Material specialKeyMat = CreateColorMaterial("SpecialKeyMat", new Color(0.75f, 0.78f, 0.82f), 0.2f);
 
-            // Room Materials
-            Material floorWoodMat = CreateColorMaterial("FloorWoodMat", new Color(0.48f, 0.33f, 0.22f), 0.45f);
-            Material rugMat = CreateColorMaterial("RugMat", new Color(0.72f, 0.75f, 0.78f), 0.05f);
-            Material wallMat = CreateColorMaterial("WallPaintMat", new Color(0.92f, 0.90f, 0.86f), 0.05f);
-            Material baseboardMat = CreateColorMaterial("BaseboardMat", new Color(0.28f, 0.19f, 0.13f), 0.3f);
-            Material ceilingMat = CreateColorMaterial("CeilingMat", new Color(0.97f, 0.97f, 0.97f), 0.05f);
+            // Bright, Clean Room Materials
+            Material floorWoodMat = CreateColorMaterial("FloorWoodMat", new Color(0.58f, 0.42f, 0.28f), 0.45f); // Honey warm oak
+            Material rugMat = CreateColorMaterial("RugMat", new Color(0.78f, 0.80f, 0.82f), 0.05f);             // Light cozy rug
+            Material wallMat = CreateColorMaterial("WallPaintMat", new Color(0.96f, 0.95f, 0.92f), 0.05f);         // Bright warm off-white
+            Material baseboardMat = CreateColorMaterial("BaseboardMat", new Color(0.32f, 0.22f, 0.15f), 0.3f);
+            Material ceilingMat = CreateColorMaterial("CeilingMat", new Color(0.98f, 0.98f, 0.98f), 0.05f);
             Material windowFrameMat = CreateColorMaterial("WindowFrameMat", new Color(0.15f, 0.16f, 0.18f), 0.3f);
-            Material chairFabricMat = CreateColorMaterial("ChairFabricMat", new Color(0.18f, 0.20f, 0.24f), 0.1f);
             Material plantPotMat = CreateColorMaterial("PlantPotMat", new Color(0.95f, 0.95f, 0.96f), 0.5f);
-            Material plantLeafMat = CreateColorMaterial("PlantLeafMat", new Color(0.22f, 0.55f, 0.24f), 0.3f);
-            Material lampMat = CreateColorMaterial("LampMetalMat", new Color(0.85f, 0.70f, 0.35f), 0.6f); // Warm brass lamp
+            Material plantLeafMat = CreateColorMaterial("PlantLeafMat", new Color(0.24f, 0.60f, 0.26f), 0.3f);
+            Material lampMat = CreateColorMaterial("LampMetalMat", new Color(0.90f, 0.76f, 0.40f), 0.6f);
 
-            // Build Cozy Study Room Environment
-            BuildCozyRoomEnvironment(root.transform, floorWoodMat, rugMat, wallMat, baseboardMat, ceilingMat, windowFrameMat, chairFabricMat, plantPotMat, plantLeafMat, lampMat);
+            // Build Cozy Study Room Environment (Without chair, with bright recessed downlights)
+            BuildCozyRoomEnvironment(root.transform, floorWoodMat, rugMat, wallMat, baseboardMat, ceilingMat, windowFrameMat, plantPotMat, plantLeafMat, lampMat);
 
             // 2. Desk TableTop
             GameObject table = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -285,7 +284,7 @@ namespace DeskVR.Editor
             // 8. Virtual Keyboard
             BuildVirtualKeyboard(root.transform, legMat, keyMat, specialKeyMat);
 
-            // Lighting Setup (Natural Warm Daylight)
+            // Lighting Setup (Natural Warm Daylight + Ambient Boost)
             ConfigureLighting();
 
             // Ensure EventSystem exists in the scene
@@ -298,10 +297,10 @@ namespace DeskVR.Editor
             EditorSceneManager.MarkSceneDirty(activeScene);
             EditorSceneManager.SaveScene(activeScene);
 
-            Debug.Log("<color=green><b>[DeskVR]</b> ¡Estudio Cálido y Estación de trabajo construidos exitosamente!</color>");
+            Debug.Log("<color=green><b>[DeskVR]</b> ¡Estudio Luminoso y Estación de trabajo construidos exitosamente!</color>");
         }
 
-        private static void BuildCozyRoomEnvironment(Transform parent, Material floorMat, Material rugMat, Material wallMat, Material baseboardMat, Material ceilingMat, Material windowFrameMat, Material chairFabricMat, Material plantPotMat, Material plantLeafMat, Material lampMat)
+        private static void BuildCozyRoomEnvironment(Transform parent, Material floorMat, Material rugMat, Material wallMat, Material baseboardMat, Material ceilingMat, Material windowFrameMat, Material plantPotMat, Material plantLeafMat, Material lampMat)
         {
             GameObject room = new GameObject("Room_Environment");
             room.transform.SetParent(parent, false);
@@ -376,7 +375,7 @@ namespace DeskVR.Editor
             leftWallSideB.transform.localScale = new Vector3(0.10f, 1.30f, 1.50f);
             leftWallSideB.GetComponent<MeshRenderer>().sharedMaterial = wallMat;
 
-            // Window Frame & Glass
+            // Window Frame
             GameObject winFrame = GameObject.CreatePrimitive(PrimitiveType.Cube);
             winFrame.name = "Window_Frame";
             winFrame.transform.SetParent(room.transform, false);
@@ -384,22 +383,22 @@ namespace DeskVR.Editor
             winFrame.transform.localScale = new Vector3(0.08f, 1.25f, 1.70f);
             winFrame.GetComponent<MeshRenderer>().sharedMaterial = windowFrameMat;
 
-            // Sky / Vista Plane outside window
+            // Sky / Daylight Vista Quad outside window
             GameObject skyVista = GameObject.CreatePrimitive(PrimitiveType.Quad);
             skyVista.name = "Window_SkyVista";
             skyVista.transform.SetParent(room.transform, false);
             skyVista.transform.position = new Vector3(-2.35f, 1.50f, 0.40f);
             skyVista.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
             skyVista.transform.localScale = new Vector3(2.5f, 1.8f, 1f);
-            Material skyVistaMat = CreateColorMaterial("SkyVistaMat", new Color(0.72f, 0.88f, 0.98f), 0.1f);
+            Material skyVistaMat = CreateColorMaterial("SkyVistaMat", new Color(0.82f, 0.92f, 0.99f), 0.1f);
             skyVista.GetComponent<MeshRenderer>().sharedMaterial = skyVistaMat;
             UnityEngine.Object.DestroyImmediate(skyVista.GetComponent<Collider>());
 
-            // Baseboards (Zócalos)
+            // Baseboards
             CreateBaseboard(room.transform, new Vector3(0f, 0.05f, 2.59f), new Vector3(4.5f, 0.10f, 0.02f), baseboardMat);
             CreateBaseboard(room.transform, new Vector3(2.19f, 0.05f, 0.40f), new Vector3(0.02f, 0.10f, 4.5f), baseboardMat);
 
-            // 4. Ceiling & Soft Ambient Light
+            // 4. Ceiling & 4 Bright Recessed Downlights
             GameObject ceiling = GameObject.CreatePrimitive(PrimitiveType.Cube);
             ceiling.name = "Room_Ceiling";
             ceiling.transform.SetParent(room.transform, false);
@@ -407,16 +406,39 @@ namespace DeskVR.Editor
             ceiling.transform.localScale = new Vector3(4.60f, 0.02f, 4.60f);
             ceiling.GetComponent<MeshRenderer>().sharedMaterial = ceilingMat;
 
-            GameObject ceilingLightGO = new GameObject("Ceiling_AmbientPointLight");
-            ceilingLightGO.transform.SetParent(room.transform, false);
-            ceilingLightGO.transform.position = new Vector3(0f, 2.65f, 0.50f);
-            Light ceilingLight = ceilingLightGO.AddComponent<Light>();
-            ceilingLight.type = LightType.Point;
-            ceilingLight.color = new Color(1.0f, 0.94f, 0.86f);
-            ceilingLight.intensity = 0.85f;
-            ceilingLight.range = 7.5f;
+            // 4 Powerful Recessed Downlights
+            Vector3[] ceilingLightPositions = new Vector3[]
+            {
+                new Vector3( 0.00f, 2.70f,  0.65f), // Directly above desk & monitor
+                new Vector3( 0.00f, 2.70f, -0.60f), // Above user
+                new Vector3(-1.10f, 2.70f,  1.10f), // Left side
+                new Vector3( 1.10f, 2.70f,  1.10f)  // Right side
+            };
 
-            // 5. Desk Lamp (with warm focused light)
+            Material fixtureMat = CreateColorMaterial("FixtureMat", new Color(0.96f, 0.96f, 0.96f), 0.8f);
+
+            for (int i = 0; i < ceilingLightPositions.Length; i++)
+            {
+                GameObject fixture = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                fixture.name = $"Ceiling_LightFixture_{i + 1}";
+                fixture.transform.SetParent(room.transform, false);
+                fixture.transform.position = ceilingLightPositions[i];
+                fixture.transform.localScale = new Vector3(0.24f, 0.015f, 0.24f);
+                fixture.GetComponent<MeshRenderer>().sharedMaterial = fixtureMat;
+                UnityEngine.Object.DestroyImmediate(fixture.GetComponent<Collider>());
+
+                GameObject lightGO = new GameObject($"Downlight_{i + 1}");
+                lightGO.transform.SetParent(fixture.transform, false);
+                lightGO.transform.localPosition = new Vector3(0f, -0.05f, 0f);
+
+                Light pLight = lightGO.AddComponent<Light>();
+                pLight.type = LightType.Point;
+                pLight.color = new Color(1.0f, 0.97f, 0.92f);
+                pLight.intensity = (i == 0) ? 3.0f : 2.2f; // High intensity over the desk
+                pLight.range = 9.0f;
+            }
+
+            // 5. Desk Lamp (with warm bright light)
             BuildDeskLamp(room.transform, lampMat);
 
             // 6. Succulent Plant on Desk
@@ -424,9 +446,6 @@ namespace DeskVR.Editor
 
             // 7. Floating Shelf on Back Wall (with books & art)
             BuildWallShelf(room.transform, baseboardMat);
-
-            // 8. Ergonomic Office Chair
-            BuildOfficeChair(room.transform, chairFabricMat, windowFrameMat);
         }
 
         private static void CreateBaseboard(Transform parent, Vector3 pos, Vector3 scale, Material mat)
@@ -445,21 +464,18 @@ namespace DeskVR.Editor
             lampRoot.transform.SetParent(parent, false);
             lampRoot.transform.position = new Vector3(-0.52f, 0.742f, 0.88f);
 
-            // Base
             GameObject lampBase = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             lampBase.transform.SetParent(lampRoot.transform, false);
             lampBase.transform.localPosition = Vector3.zero;
             lampBase.transform.localScale = new Vector3(0.12f, 0.008f, 0.12f);
             lampBase.GetComponent<MeshRenderer>().sharedMaterial = lampMat;
 
-            // Stem / Arm
             GameObject stem = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             stem.transform.SetParent(lampRoot.transform, false);
             stem.transform.localPosition = new Vector3(0f, 0.18f, 0f);
             stem.transform.localScale = new Vector3(0.015f, 0.18f, 0.015f);
             stem.GetComponent<MeshRenderer>().sharedMaterial = lampMat;
 
-            // Lamp Shade / Head angled to desk
             GameObject shade = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             shade.transform.SetParent(lampRoot.transform, false);
             shade.transform.localPosition = new Vector3(0.08f, 0.35f, -0.06f);
@@ -467,31 +483,28 @@ namespace DeskVR.Editor
             shade.transform.localScale = new Vector3(0.10f, 0.06f, 0.10f);
             shade.GetComponent<MeshRenderer>().sharedMaterial = lampMat;
 
-            // Warm Cozy Point Light
             GameObject lightGO = new GameObject("Lamp_WarmLight");
             lightGO.transform.SetParent(shade.transform, false);
             lightGO.transform.localPosition = new Vector3(0f, -0.04f, 0f);
             Light pLight = lightGO.AddComponent<Light>();
             pLight.type = LightType.Point;
-            pLight.color = new Color(1.0f, 0.88f, 0.72f);
-            pLight.intensity = 1.2f;
-            pLight.range = 1.6f;
+            pLight.color = new Color(1.0f, 0.92f, 0.78f);
+            pLight.intensity = 2.4f;
+            pLight.range = 2.5f;
         }
 
-        private static void BuildDeskPlant(Transform parent, Material potMat, Material leafMat)
+        private static void BuildDeskPlant(Transform parent, Material plantPotMat, Material plantLeafMat)
         {
             GameObject plantRoot = new GameObject("Desk_Plant_Succulent");
             plantRoot.transform.SetParent(parent, false);
             plantRoot.transform.position = new Vector3(0.54f, 0.742f, 0.88f);
 
-            // Ceramic Pot
             GameObject pot = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             pot.transform.SetParent(plantRoot.transform, false);
             pot.transform.localPosition = new Vector3(0f, 0.04f, 0f);
             pot.transform.localScale = new Vector3(0.09f, 0.04f, 0.09f);
-            pot.GetComponent<MeshRenderer>().sharedMaterial = potMat;
+            pot.GetComponent<MeshRenderer>().sharedMaterial = plantPotMat;
 
-            // Succulent Leaves (geometric layered)
             for (int i = 0; i < 6; i++)
             {
                 float angle = i * 60f;
@@ -501,7 +514,7 @@ namespace DeskVR.Editor
                 leaf.transform.localPosition = new Vector3(Mathf.Sin(angle * Mathf.Deg2Rad) * 0.025f, 0.085f, Mathf.Cos(angle * Mathf.Deg2Rad) * 0.025f);
                 leaf.transform.localRotation = Quaternion.Euler(20f, angle, 0f);
                 leaf.transform.localScale = new Vector3(0.035f, 0.015f, 0.06f);
-                leaf.GetComponent<MeshRenderer>().sharedMaterial = leafMat;
+                leaf.GetComponent<MeshRenderer>().sharedMaterial = plantLeafMat;
             }
         }
 
@@ -514,7 +527,6 @@ namespace DeskVR.Editor
             shelf.transform.localScale = new Vector3(1.30f, 0.03f, 0.22f);
             shelf.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
 
-            // Decorative books on shelf
             Material bookMat1 = CreateColorMaterial("BookBlueMat", new Color(0.18f, 0.35f, 0.65f), 0.2f);
             Material bookMat2 = CreateColorMaterial("BookRedMat", new Color(0.68f, 0.22f, 0.20f), 0.2f);
 
@@ -533,54 +545,20 @@ namespace DeskVR.Editor
             book2.GetComponent<MeshRenderer>().sharedMaterial = bookMat2;
         }
 
-        private static void BuildOfficeChair(Transform parent, Material fabricMat, Material metalMat)
-        {
-            GameObject chairRoot = new GameObject("OfficeChair");
-            chairRoot.transform.SetParent(parent, false);
-            chairRoot.transform.position = new Vector3(0f, 0f, 0.12f);
-
-            // Star base
-            GameObject baseCenter = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            baseCenter.name = "Chair_Base";
-            baseCenter.transform.SetParent(chairRoot.transform, false);
-            baseCenter.transform.localPosition = new Vector3(0f, 0.06f, 0f);
-            baseCenter.transform.localScale = new Vector3(0.50f, 0.02f, 0.50f);
-            baseCenter.GetComponent<MeshRenderer>().sharedMaterial = metalMat;
-
-            // Hydraulic Piston
-            GameObject piston = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            piston.name = "Chair_Piston";
-            piston.transform.SetParent(chairRoot.transform, false);
-            piston.transform.localPosition = new Vector3(0f, 0.25f, 0f);
-            piston.transform.localScale = new Vector3(0.06f, 0.20f, 0.06f);
-            piston.GetComponent<MeshRenderer>().sharedMaterial = metalMat;
-
-            // Seat Cushion
-            GameObject seat = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            seat.name = "Chair_Seat";
-            seat.transform.SetParent(chairRoot.transform, false);
-            seat.transform.localPosition = new Vector3(0f, 0.44f, 0f);
-            seat.transform.localScale = new Vector3(0.48f, 0.07f, 0.46f);
-            seat.GetComponent<MeshRenderer>().sharedMaterial = fabricMat;
-
-            // Backrest
-            GameObject backrest = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            backrest.name = "Chair_Backrest";
-            backrest.transform.SetParent(chairRoot.transform, false);
-            backrest.transform.localPosition = new Vector3(0f, 0.72f, -0.22f);
-            backrest.transform.localRotation = Quaternion.Euler(-5f, 0f, 0f);
-            backrest.transform.localScale = new Vector3(0.44f, 0.52f, 0.06f);
-            backrest.GetComponent<MeshRenderer>().sharedMaterial = fabricMat;
-        }
-
         private static void ConfigureLighting()
         {
+            // 1. Ambient Lighting (Illuminates interior room surfaces evenly)
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.76f, 0.78f, 0.82f);
+            RenderSettings.ambientIntensity = 1.35f;
+
+            // 2. Sunlight / Directional Light
             Light dirLight = UnityEngine.Object.FindFirstObjectByType<Light>();
             if (dirLight != null && dirLight.type == LightType.Directional)
             {
-                dirLight.transform.rotation = Quaternion.Euler(32f, 50f, 0f); // Angles sunlight from window
-                dirLight.color = new Color(1.0f, 0.96f, 0.90f);
-                dirLight.intensity = 1.15f;
+                dirLight.transform.rotation = Quaternion.Euler(35f, 55f, 0f);
+                dirLight.color = new Color(1.0f, 0.97f, 0.92f);
+                dirLight.intensity = 1.35f;
                 dirLight.shadows = LightShadows.Soft;
             }
         }
