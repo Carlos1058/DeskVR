@@ -41,6 +41,15 @@ namespace DeskVR.Editor
             );
         }
 
+        public static void BuildWorkstationBatch()
+        {
+            EditorSceneManager.OpenScene(MainScenePath);
+            BuildWorkstation();
+            SetSceneAsDefaultBuildScene(MainScenePath);
+            EditorSceneManager.SaveOpenScenes();
+            Debug.Log("[DeskVR] Batch build completed successfully!");
+        }
+
         public static void BuildWorkstation()
         {
             var activeScene = EditorSceneManager.GetActiveScene();
@@ -237,12 +246,19 @@ namespace DeskVR.Editor
             // 6d. Notepad Window
             BuildNotepadWindow(canvasGO.transform, iconBtn);
 
+            // Find and tag VR Camera
+            Camera vrCam = FindAndTagVRCamera();
+            if (vrCam != null)
+            {
+                canvas.worldCamera = vrCam;
+            }
+
             // 6e. Screen Cursor
             GameObject cursorGO = new GameObject("ScreenCursor", typeof(RectTransform), typeof(Image));
             cursorGO.transform.SetParent(canvasGO.transform, false);
             RectTransform cursorRect = cursorGO.GetComponent<RectTransform>();
-            cursorRect.pivot = new Vector2(0f, 1f);
-            cursorRect.sizeDelta = new Vector2(28f, 28f);
+            cursorRect.pivot = new Vector2(0.08f, 0.92f);
+            cursorRect.sizeDelta = new Vector2(36f, 48f);
             cursorRect.anchoredPosition = Vector2.zero;
             Image curImg = cursorGO.GetComponent<Image>();
             curImg.color = Color.white;
@@ -253,6 +269,8 @@ namespace DeskVR.Editor
             cursorSO.FindProperty("screenRect").objectReferenceValue = canvasRect;
             cursorSO.FindProperty("cursorRect").objectReferenceValue = cursorRect;
             cursorSO.FindProperty("raycaster").objectReferenceValue = raycaster;
+            if (vrCam != null) cursorSO.FindProperty("eventCamera").objectReferenceValue = vrCam;
+            cursorSO.FindProperty("cursorSpeedMultiplier").floatValue = 1.0f;
             cursorSO.ApplyModifiedProperties();
 
             // 7. Virtual Mouse
@@ -271,6 +289,8 @@ namespace DeskVR.Editor
             XRGrabInteractable grab = mouseGO.GetComponent<XRGrabInteractable>();
             if (grab == null) grab = mouseGO.AddComponent<XRGrabInteractable>();
             grab.movementType = XRBaseInteractable.MovementType.Instantaneous;
+            grab.trackPosition = false;
+            grab.trackRotation = false;
             grab.throwOnDetach = false;
 
             VirtualMouseController mouseCtrl = mouseGO.AddComponent<VirtualMouseController>();
@@ -278,11 +298,14 @@ namespace DeskVR.Editor
             mouseSO.FindProperty("deskSurface").objectReferenceValue = mousePad.transform;
             mouseSO.FindProperty("deskAreaSize").vector2Value = new Vector2(0.36f, 0.26f);
             mouseSO.FindProperty("heightOffset").floatValue = 0.015f;
-            mouseSO.FindProperty("mouseSensitivity").floatValue = 1300f;
+            mouseSO.FindProperty("mouseSensitivity").floatValue = 6500f;
             mouseSO.ApplyModifiedProperties();
 
             // 8. Virtual Keyboard
             BuildVirtualKeyboard(root.transform, legMat, keyMat, specialKeyMat);
+
+            // 9. Controller Touch Pointers for 3D Keyboard
+            ConfigureControllerPointerTips();
 
             // Lighting Setup (Natural Warm Daylight + Ambient Boost)
             ConfigureLighting();
@@ -842,6 +865,91 @@ namespace DeskVR.Editor
             txt.fontSize = label.Length > 2 ? 22 : 36;
             txt.fontStyle = FontStyle.Bold;
             txt.color = new Color(0.12f, 0.12f, 0.15f);
+        }
+
+        private static Camera FindAndTagVRCamera()
+        {
+            var allCams = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Camera chosenCam = null;
+
+            foreach (var cam in allCams)
+            {
+                string n = cam.name.ToLower();
+                if (n == "main camera" || n.Contains("vr") || n.Contains("head"))
+                {
+                    chosenCam = cam;
+                    break;
+                }
+            }
+
+            if (chosenCam == null && allCams.Length > 0)
+            {
+                chosenCam = allCams[0];
+            }
+
+            if (chosenCam != null)
+            {
+                chosenCam.gameObject.tag = "MainCamera";
+            }
+
+            return chosenCam;
+        }
+
+        private static void ConfigureControllerPointerTips()
+        {
+            var allTransforms = UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Material tipMat = CreateColorMaterial("PointerTipMat", new Color(0.18f, 0.72f, 1.0f), 0.85f);
+
+            foreach (var t in allTransforms)
+            {
+                string n = t.name.ToLower();
+                if (n == "left controller" || n == "right controller" || n == "lefthand controller" || n == "righthand controller")
+                {
+                    Transform existingTip = t.Find("DeskVR_PointerTip");
+                    GameObject tipGO;
+                    if (existingTip == null)
+                    {
+                        tipGO = new GameObject("DeskVR_PointerTip");
+                        tipGO.transform.SetParent(t, false);
+                    }
+                    else
+                    {
+                        tipGO = existingTip.gameObject;
+                    }
+
+                    // Forward tip of controller (Quest 2 natural pointing angle & reach)
+                    tipGO.transform.localPosition = new Vector3(0f, -0.015f, 0.085f);
+                    tipGO.transform.localRotation = Quaternion.identity;
+
+                    var col = tipGO.GetComponent<SphereCollider>();
+                    if (col == null) col = tipGO.AddComponent<SphereCollider>();
+                    col.radius = 0.018f;
+                    col.isTrigger = true;
+
+                    var rb = tipGO.GetComponent<Rigidbody>();
+                    if (rb == null) rb = tipGO.AddComponent<Rigidbody>();
+                    rb.isKinematic = true;
+                    rb.useGravity = false;
+
+                    Transform visTrans = tipGO.transform.Find("VisualTip");
+                    GameObject visualTip;
+                    if (visTrans == null)
+                    {
+                        visualTip = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                        visualTip.name = "VisualTip";
+                        visualTip.transform.SetParent(tipGO.transform, false);
+                        UnityEngine.Object.DestroyImmediate(visualTip.GetComponent<Collider>());
+                    }
+                    else
+                    {
+                        visualTip = visTrans.gameObject;
+                    }
+
+                    visualTip.transform.localPosition = Vector3.zero;
+                    visualTip.transform.localScale = new Vector3(0.014f, 0.014f, 0.014f);
+                    visualTip.GetComponent<MeshRenderer>().sharedMaterial = tipMat;
+                }
+            }
         }
 
         private static void SetSceneAsDefaultBuildScene(string scenePath)

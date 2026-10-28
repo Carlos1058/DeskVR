@@ -8,18 +8,19 @@ namespace DeskVR.Peripherals
 {
     /// <summary>
     /// Controls the physical 3D mouse on the virtual desk.
-    /// Constrains movement to the desk surface, calculates 2D deltas for the simulated OS,
-    /// and triggers haptic pulses on user interactions (clicks, grab).
+    /// Uses delta-based tracking relative to the VR controller so the mouse slides smoothly on the mousepad.
+    /// Disables XRI automatic transform tracking so XRI doesn't fight desk plane constraints.
+    /// Emits 2D movement and click events for the simulated OS.
     /// </summary>
     [RequireComponent(typeof(XRGrabInteractable))]
     public class VirtualMouseController : MonoBehaviour
     {
         [Header("Desk Bounds & Constraints")]
-        [Tooltip("Transform of the desk or mousepad used as surface reference")]
+        [Tooltip("Transform of the mousepad used as center reference")]
         [SerializeField] private Transform deskSurface;
 
         [Tooltip("Width (X) and Depth (Z) in meters for the allowed mouse area")]
-        [SerializeField] private Vector2 deskAreaSize = new Vector2(0.40f, 0.30f);
+        [SerializeField] private Vector2 deskAreaSize = new Vector2(0.36f, 0.26f);
 
         [Tooltip("Height offset so the mouse sits nicely on top of the surface")]
         [SerializeField] private float heightOffset = 0.015f;
@@ -28,16 +29,16 @@ namespace DeskVR.Peripherals
         [SerializeField] private bool lockRotation = true;
 
         [Header("Sensitivity")]
-        [Tooltip("Multiplier to convert physical 3D movement to 2D screen pixels")]
-        [SerializeField] private float mouseSensitivity = 1400f;
+        [Tooltip("Multiplier to convert physical 3D displacement to 2D screen pixels")]
+        [SerializeField] private float mouseSensitivity = 6500f;
 
         [Header("Haptic Feedback Settings")]
         [Range(0f, 1f)]
-        [SerializeField] private float grabHapticAmplitude = 0.25f;
+        [SerializeField] private float grabHapticAmplitude = 0.35f;
         [SerializeField] private float grabHapticDuration = 0.05f;
 
         [Range(0f, 1f)]
-        [SerializeField] private float clickHapticAmplitude = 0.65f;
+        [SerializeField] private float clickHapticAmplitude = 0.75f;
         [SerializeField] private float clickHapticDuration = 0.06f;
 
         // Static events for the simulated OS and Curriculum modules
@@ -49,10 +50,11 @@ namespace DeskVR.Peripherals
         public static event Action<bool> OnGrabStateChanged;
 
         private XRGrabInteractable grabInteractable;
-        private Vector3 lastPosition;
         private bool isHeld = false;
         private bool isLeftClickPressed = false;
         private IXRSelectInteractor currentInteractor;
+        private Transform activeControllerTransform;
+        private Vector3 lastControllerPosition;
 
         public bool IsHeld => isHeld;
         public bool IsLeftClickPressed => isLeftClickPressed;
@@ -62,6 +64,12 @@ namespace DeskVR.Peripherals
             grabInteractable = GetComponent<XRGrabInteractable>();
             if (grabInteractable != null)
             {
+                // Crucial: Tell XRI not to move or rotate the transform directly.
+                // We handle constrained 2D movement on the desk surface manually.
+                grabInteractable.trackPosition = false;
+                grabInteractable.trackRotation = false;
+                grabInteractable.throwOnDetach = false;
+
                 grabInteractable.selectEntered.AddListener(OnGrabbed);
                 grabInteractable.selectExited.AddListener(OnReleased);
                 grabInteractable.activated.AddListener(OnActivated);
@@ -71,19 +79,69 @@ namespace DeskVR.Peripherals
 
         private void Start()
         {
-            lastPosition = transform.position;
             if (deskSurface != null)
             {
-                ClampToDesk();
+                ClampInitialPosition();
             }
         }
 
-        private void LateUpdate()
+        private void ClampInitialPosition()
         {
-            if (isHeld)
+            if (deskSurface == null) return;
+            Vector3 pos = transform.position;
+            Vector3 deskPos = deskSurface.position;
+            pos.y = deskPos.y + heightOffset;
+
+            float halfWidth = deskAreaSize.x * 0.5f;
+            float halfDepth = deskAreaSize.y * 0.5f;
+            pos.x = Mathf.Clamp(pos.x, deskPos.x - halfWidth, deskPos.x + halfWidth);
+            pos.z = Mathf.Clamp(pos.z, deskPos.z - halfDepth, deskPos.z + halfDepth);
+
+            transform.position = pos;
+            if (lockRotation)
             {
-                ClampToDesk();
-                CalculateDelta();
+                transform.rotation = Quaternion.Euler(0f, deskSurface.eulerAngles.y, 0f);
+            }
+        }
+
+        private void Update()
+        {
+            if (isHeld && activeControllerTransform != null)
+            {
+                Vector3 currentControllerPos = activeControllerTransform.position;
+                Vector3 controllerDelta = currentControllerPos - lastControllerPosition;
+                lastControllerPosition = currentControllerPos;
+
+                // Move mouse along the desk X/Z plane according to controller displacement
+                Vector3 currentMousePos = transform.position;
+                Vector3 newMousePos = currentMousePos + new Vector3(controllerDelta.x, 0f, controllerDelta.z);
+
+                // Clamp within mousepad surface bounds
+                if (deskSurface != null)
+                {
+                    Vector3 deskPos = deskSurface.position;
+                    float halfWidth = deskAreaSize.x * 0.5f;
+                    float halfDepth = deskAreaSize.y * 0.5f;
+
+                    newMousePos.y = deskPos.y + heightOffset;
+                    newMousePos.x = Mathf.Clamp(newMousePos.x, deskPos.x - halfWidth, deskPos.x + halfWidth);
+                    newMousePos.z = Mathf.Clamp(newMousePos.z, deskPos.z - halfDepth, deskPos.z + halfDepth);
+                }
+
+                Vector3 actualDisplacement = newMousePos - currentMousePos;
+                transform.position = newMousePos;
+
+                if (lockRotation && deskSurface != null)
+                {
+                    transform.rotation = Quaternion.Euler(0f, deskSurface.eulerAngles.y, 0f);
+                }
+
+                // If mouse moved, fire screen delta event
+                if (actualDisplacement.sqrMagnitude > 0.0000001f)
+                {
+                    Vector2 screenDelta = new Vector2(actualDisplacement.x, actualDisplacement.z) * mouseSensitivity;
+                    OnMouseMoved?.Invoke(screenDelta);
+                }
             }
         }
 
@@ -91,7 +149,9 @@ namespace DeskVR.Peripherals
         {
             isHeld = true;
             currentInteractor = args.interactorObject;
-            lastPosition = transform.position;
+            activeControllerTransform = args.interactorObject.transform;
+            lastControllerPosition = activeControllerTransform.position;
+
             TriggerHaptic(grabHapticAmplitude, grabHapticDuration);
             OnGrabStateChanged?.Invoke(true);
         }
@@ -99,12 +159,12 @@ namespace DeskVR.Peripherals
         private void OnReleased(SelectExitEventArgs args)
         {
             isHeld = false;
+            activeControllerTransform = null;
             if (isLeftClickPressed)
             {
                 OnDeactivated(null);
             }
             currentInteractor = null;
-            ClampToDesk();
             OnGrabStateChanged?.Invoke(false);
         }
 
@@ -136,49 +196,16 @@ namespace DeskVR.Peripherals
             OnRightClick?.Invoke();
         }
 
-        private void ClampToDesk()
-        {
-            if (deskSurface == null) return;
-
-            Vector3 currentPos = transform.position;
-            Vector3 deskPos = deskSurface.position;
-
-            currentPos.y = deskPos.y + heightOffset;
-
-            float halfWidth = deskAreaSize.x * 0.5f;
-            float halfDepth = deskAreaSize.y * 0.5f;
-
-            currentPos.x = Mathf.Clamp(currentPos.x, deskPos.x - halfWidth, deskPos.x + halfWidth);
-            currentPos.z = Mathf.Clamp(currentPos.z, deskPos.z - halfDepth, deskPos.z + halfDepth);
-
-            transform.position = currentPos;
-
-            if (lockRotation)
-            {
-                transform.rotation = Quaternion.Euler(0f, deskSurface.eulerAngles.y, 0f);
-            }
-        }
-
-        private void CalculateDelta()
-        {
-            Vector3 currentPos = transform.position;
-            Vector3 diff = currentPos - lastPosition;
-
-            if (diff.sqrMagnitude > 0.0000005f)
-            {
-                Vector3 localDiff = deskSurface != null ? deskSurface.InverseTransformDirection(diff) : diff;
-                Vector2 screenDelta = new Vector2(localDiff.x, localDiff.z) * mouseSensitivity;
-
-                OnMouseMoved?.Invoke(screenDelta);
-                lastPosition = currentPos;
-            }
-        }
-
         public void TriggerHaptic(float amplitude, float duration)
         {
             if (currentInteractor is XRBaseInputInteractor inputInteractor)
             {
                 inputInteractor.SendHapticImpulse(amplitude, duration);
+            }
+            else if (activeControllerTransform != null)
+            {
+                var input = activeControllerTransform.GetComponentInParent<XRBaseInputInteractor>();
+                if (input != null) input.SendHapticImpulse(amplitude, duration);
             }
         }
 
