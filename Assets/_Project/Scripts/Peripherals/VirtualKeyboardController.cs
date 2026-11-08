@@ -1,16 +1,14 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.XR.Interaction.Toolkit;
-using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 namespace DeskVR.Peripherals
 {
     /// <summary>
     /// Coordinates all 3D keys on the physical virtual keyboard.
-    /// Tracks VR controller proximity and pointer tips so typing registers seamlessly
-    /// both via direct physical contact (finger / controller tip) and trigger colliders.
-    /// Emits typing events for active input fields on the screen and manages key highlights.
+    /// Implements precise single-key targeting per pointer (rejecting multi-key overlapping),
+    /// visual hover animation on touch, and Index Trigger (gatillo) confirmation to write.
+    /// Completely immune to VR headset / camera proximity.
     /// </summary>
     public class VirtualKeyboardController : MonoBehaviour
     {
@@ -21,16 +19,18 @@ namespace DeskVR.Peripherals
         [SerializeField] private AudioSource audioSource;
         [SerializeField] private AudioClip keyClickSound;
 
-        [Header("Touch Settings")]
-        [Tooltip("Fallback distance in meters to trigger key press")]
-        [SerializeField] private float sphericalTouchRadius = 0.028f;
+        [Header("Targeting Constraints")]
+        [Tooltip("Maximum distance from pointer tip to key center for contact detection (meters)")]
+        [SerializeField] private float touchRadius = 0.018f;
 
         private static VirtualKeyboardController instance;
+        public static VirtualKeyboardController Instance => instance;
+
         private readonly List<VirtualKey> allKeys = new List<VirtualKey>();
         private readonly Dictionary<string, VirtualKey> keyLookup = new Dictionary<string, VirtualKey>(StringComparer.OrdinalIgnoreCase);
 
-        private readonly List<Transform> activePointers = new List<Transform>();
-        private readonly HashSet<VirtualKey> keysTouchedThisFrame = new HashSet<VirtualKey>();
+        private readonly List<DeskVRPointerTip> activePointers = new List<DeskVRPointerTip>();
+        private readonly HashSet<VirtualKey> targetedKeysThisFrame = new HashSet<VirtualKey>();
 
         private void Awake()
         {
@@ -51,55 +51,39 @@ namespace DeskVR.Peripherals
             FindVRPointers();
         }
 
-        private void RegisterChildKeys()
+        public void RegisterChildKeys()
         {
             allKeys.Clear();
             keyLookup.Clear();
-            var keys = GetComponentsInChildren<VirtualKey>();
+            var keys = GetComponentsInChildren<VirtualKey>(true);
             foreach (var key in keys)
             {
                 allKeys.Add(key);
+
                 if (!string.IsNullOrEmpty(key.DisplayLabel) && !keyLookup.ContainsKey(key.DisplayLabel))
                 {
                     keyLookup[key.DisplayLabel] = key;
                 }
+
+                if (!string.IsNullOrEmpty(key.CharacterValue) && !keyLookup.ContainsKey(key.CharacterValue))
+                {
+                    keyLookup[key.CharacterValue] = key;
+                }
             }
         }
 
-        private void FindVRPointers()
+        public void FindVRPointers()
         {
             activePointers.Clear();
 
-            // 1. First priority: Dedicated pointer tips created by DeskVR
-            var allTransforms = FindObjectsByType<Transform>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            foreach (var t in allTransforms)
+            // Find all authorized DeskVRPointerTip components (created on left & right controllers)
+            var taggedTips = FindObjectsByType<DeskVRPointerTip>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            foreach (var tip in taggedTips)
             {
-                if (t.name == "DeskVR_PointerTip" && !activePointers.Contains(t))
+                // Absolute safeguard: Never evaluate headset / camera position
+                if (tip.GetComponentInParent<Camera>() == null && !activePointers.Contains(tip))
                 {
-                    activePointers.Add(t);
-                }
-            }
-
-            // 2. XR Controller Interactors
-            var interactors = FindObjectsByType<XRBaseInputInteractor>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            foreach (var interactor in interactors)
-            {
-                if (interactor.gameObject.activeInHierarchy && !activePointers.Contains(interactor.transform))
-                {
-                    activePointers.Add(interactor.transform);
-                }
-            }
-
-            // 3. Fallback: Search for controller objects by name
-            if (activePointers.Count == 0)
-            {
-                foreach (var t in allTransforms)
-                {
-                    string n = t.name.ToLower();
-                    if ((n.Contains("controller") || n.Contains("hand")) && t.GetComponent<Camera>() == null)
-                    {
-                        if (!activePointers.Contains(t)) activePointers.Add(t);
-                    }
+                    activePointers.Add(tip);
                 }
             }
         }
@@ -112,55 +96,65 @@ namespace DeskVR.Peripherals
                 if (activePointers.Count == 0) return;
             }
 
-            keysTouchedThisFrame.Clear();
+            targetedKeysThisFrame.Clear();
 
-            // Test each pointer against each key
+            // Process each pointer (left hand, right hand)
             for (int p = 0; p < activePointers.Count; p++)
             {
                 var pointer = activePointers[p];
                 if (pointer == null || !pointer.gameObject.activeInHierarchy) continue;
 
-                Vector3 tipPos = pointer.position;
+                Vector3 tipPos = pointer.transform.position;
 
-                // If pointer is a raw controller rather than a pointer tip child, project to controller front tip
-                if (!pointer.name.Equals("DeskVR_PointerTip", StringComparison.OrdinalIgnoreCase))
-                {
-                    tipPos = pointer.TransformPoint(new Vector3(0f, -0.015f, 0.085f));
-                }
+                // Find the SINGLE closest key to this pointer tip
+                VirtualKey closestKey = null;
+                float closestDistSq = float.MaxValue;
 
                 for (int i = 0; i < allKeys.Count; i++)
                 {
                     var key = allKeys[i];
                     if (key == null) continue;
 
-                    // Evaluate in the key's local coordinate space
                     Vector3 localTip = key.transform.InverseTransformPoint(tipPos);
 
-                    // Key bounds: [-0.5, 0.5] along X and Z
-                    bool insideFootprint = Mathf.Abs(localTip.x) <= 0.65f && Mathf.Abs(localTip.z) <= 0.65f;
-                    // Key top surface is at Y = 0.5; depress contact is [-0.60, 0.70]
-                    bool withinPressHeight = localTip.y >= -0.60f && localTip.y <= 0.70f;
+                    // Precise footprint: half-extents are [-0.5, 0.5] along X and Z
+                    bool insideFootprint = Mathf.Abs(localTip.x) <= 0.55f && Mathf.Abs(localTip.z) <= 0.55f;
+                    // Contact height window: key top is at Y = 0.5; depress contact is [-0.40, 0.65]
+                    bool withinPressHeight = localTip.y >= -0.40f && localTip.y <= 0.65f;
 
-                    float dist = Vector3.Distance(tipPos, key.transform.position);
+                    float distSq = (tipPos - key.transform.position).sqrMagnitude;
 
-                    if ((insideFootprint && withinPressHeight) || (dist < sphericalTouchRadius))
+                    if ((insideFootprint && withinPressHeight) || (distSq < touchRadius * touchRadius))
                     {
-                        keysTouchedThisFrame.Add(key);
-                        if (!key.IsPressed)
+                        if (distSq < closestDistSq)
                         {
-                            key.Press(pointer);
+                            closestDistSq = distSq;
+                            closestKey = key;
                         }
+                    }
+                }
+
+                // If a key is targeted by this pointer:
+                if (closestKey != null)
+                {
+                    targetedKeysThisFrame.Add(closestKey);
+                    closestKey.SetHovered(true);
+
+                    // Confirm keystroke ONLY when index trigger (gatillo) is pressed
+                    if (pointer.WasTriggerPressedThisFrame())
+                    {
+                        closestKey.ConfirmPress(pointer);
                     }
                 }
             }
 
-            // Release any key that is no longer being touched
+            // Un-hover any key that is not targeted by any pointer this frame
             for (int i = 0; i < allKeys.Count; i++)
             {
                 var key = allKeys[i];
-                if (key != null && key.IsPressed && !keysTouchedThisFrame.Contains(key))
+                if (key != null && key.IsHovered && !targetedKeysThisFrame.Contains(key))
                 {
-                    key.Release();
+                    key.SetHovered(false);
                 }
             }
         }
@@ -169,18 +163,30 @@ namespace DeskVR.Peripherals
         {
             if (instance != null && instance.audioSource != null && instance.keyClickSound != null)
             {
-                instance.audioSource.PlayOneShot(instance.keyClickSound, 0.6f);
+                instance.audioSource.PlayOneShot(instance.keyClickSound, 0.7f);
             }
 
             OnKeyPressed?.Invoke(key);
             OnKeyTyped?.Invoke(key.CharacterValue, key.ActionType);
         }
 
-        public void HighlightKey(string label, bool highlight)
+        public void HighlightKey(string labelOrChar, bool highlight)
         {
-            if (keyLookup.TryGetValue(label, out var key))
+            if (keyLookup.TryGetValue(labelOrChar, out var key))
             {
                 key.SetHighlight(highlight);
+                return;
+            }
+
+            // Fuzzy lookup if exact match not found (e.g. "Borrar" matching "Borrar ⌫")
+            foreach (var kvp in keyLookup)
+            {
+                if (kvp.Key.StartsWith(labelOrChar, StringComparison.OrdinalIgnoreCase) ||
+                    labelOrChar.StartsWith(kvp.Key, StringComparison.OrdinalIgnoreCase))
+                {
+                    kvp.Value.SetHighlight(highlight);
+                    return;
+                }
             }
         }
 

@@ -1,7 +1,5 @@
 using System;
 using UnityEngine;
-using UnityEngine.XR.Interaction.Toolkit;
-using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 namespace DeskVR.Peripherals
 {
@@ -15,8 +13,9 @@ namespace DeskVR.Peripherals
 
     /// <summary>
     /// Represents an individual physical 3D key on the virtual keyboard.
-    /// Depresses when pressed, triggers haptic feedback, and sends key events.
-    /// Supports both physical triggers and direct proximity touching from VR controllers.
+    /// Supports a two-phase interaction model:
+    /// 1. Physical hover/touch: Depresses visually to indicate targeting, but DOES NOT type.
+    /// 2. Index Trigger confirmation: Pressing the controller trigger confirms and writes the letter.
     /// </summary>
     public class VirtualKey : MonoBehaviour
     {
@@ -27,24 +26,27 @@ namespace DeskVR.Peripherals
 
         [Header("Physical Movement")]
         [SerializeField] private float pressDepth = 0.005f; // 5mm travel distance
-        [SerializeField] private float returnSpeed = 16f;
+        [SerializeField] private float returnSpeed = 18f;
 
-        [Header("Visual Feedback")]
+        [Header("Visual Feedback Colors")]
         [SerializeField] private MeshRenderer keyRenderer;
-        [SerializeField] private Color normalColor = new Color(0.92f, 0.92f, 0.94f);
-        [SerializeField] private Color pressedColor = new Color(0.35f, 0.65f, 1.0f); // Bright blue when active
-        [SerializeField] private Color highlightColor = new Color(1.0f, 0.85f, 0.2f); // Golden glow for tutorials
+        [SerializeField] private Color normalColor = new Color(0.95f, 0.95f, 0.97f);
+        [SerializeField] private Color hoverColor = new Color(0.45f, 0.75f, 1.0f);     // Soft sky blue when pointer touches
+        [SerializeField] private Color confirmedColor = new Color(0.10f, 0.45f, 1.0f); // Deep vibrant blue when trigger confirms
+        [SerializeField] private Color highlightColor = new Color(1.0f, 0.78f, 0.08f); // Golden glow for tutorials
 
         private Vector3 initialLocalPos;
         private Vector3 pressedLocalPos;
-        private bool isPressed = false;
+        private bool isHovered = false;
         private bool isHighlighted = false;
         private Material keyMaterialInstance;
+        private float confirmFlashTimer = 0f;
 
         public KeyActionType ActionType => actionType;
         public string CharacterValue => characterValue;
         public string DisplayLabel => displayLabel;
-        public bool IsPressed => isPressed;
+        public bool IsHovered => isHovered;
+        public bool IsHighlighted => isHighlighted;
 
         private void Awake()
         {
@@ -79,74 +81,98 @@ namespace DeskVR.Peripherals
             characterValue = value;
             displayLabel = label;
             normalColor = baseColor;
-            if (keyMaterialInstance != null && !isPressed)
-            {
-                keyMaterialInstance.color = normalColor;
-            }
-        }
-
-        private void Update()
-        {
-            if (!isPressed && transform.localPosition != initialLocalPos)
-            {
-                transform.localPosition = Vector3.Lerp(transform.localPosition, initialLocalPos, Time.deltaTime * returnSpeed);
-            }
-        }
-
-        public void Press(Transform triggeringTransform = null)
-        {
-            if (isPressed) return;
-
-            isPressed = true;
-            transform.localPosition = pressedLocalPos;
-
-            if (keyMaterialInstance != null)
-            {
-                keyMaterialInstance.color = pressedColor;
-            }
-
-            // Send haptics if triggered by a controller
-            if (triggeringTransform != null)
-            {
-                var interactor = triggeringTransform.GetComponentInParent<XRBaseInputInteractor>();
-                if (interactor != null)
-                {
-                    interactor.SendHapticImpulse(0.7f, 0.05f);
-                }
-            }
-
-            // Notify controller
-            VirtualKeyboardController.TriggerKeyPressed(this);
-        }
-
-        public void Release()
-        {
-            if (!isPressed) return;
-
-            isPressed = false;
-            if (keyMaterialInstance != null)
+            if (keyMaterialInstance != null && !isHovered)
             {
                 keyMaterialInstance.color = isHighlighted ? highlightColor : normalColor;
             }
         }
 
-        public void SetHighlight(bool highlight)
+        private void Update()
         {
-            isHighlighted = highlight;
-            if (keyMaterialInstance != null && !isPressed)
+            // Handle confirmation flash decay
+            if (confirmFlashTimer > 0f)
             {
-                keyMaterialInstance.color = highlight ? highlightColor : normalColor;
+                confirmFlashTimer -= Time.deltaTime;
+                if (confirmFlashTimer <= 0f)
+                {
+                    UpdateVisualColor();
+                }
+            }
+
+            // Smooth physical return when not hovered
+            if (!isHovered && transform.localPosition != initialLocalPos)
+            {
+                transform.localPosition = Vector3.Lerp(transform.localPosition, initialLocalPos, Time.deltaTime * returnSpeed);
             }
         }
 
-        private void OnTriggerEnter(Collider other)
+        /// <summary>
+        /// Called when an authorized pointer tip hovers over this key.
+        /// Physically depresses the key and updates hover visuals, but DOES NOT type.
+        /// </summary>
+        public void SetHovered(bool hovered)
         {
-            Press(other.transform);
+            if (isHovered == hovered) return;
+
+            isHovered = hovered;
+
+            if (isHovered)
+            {
+                transform.localPosition = pressedLocalPos;
+            }
+
+            UpdateVisualColor();
         }
 
-        private void OnTriggerExit(Collider other)
+        /// <summary>
+        /// Confirms the keystroke when the user presses the Index Trigger on the controller.
+        /// Emits the character event, sends haptics, and flashes confirmed visual feedback.
+        /// </summary>
+        public void ConfirmPress(DeskVRPointerTip pointerTip)
         {
-            Release();
+            transform.localPosition = pressedLocalPos;
+            confirmFlashTimer = 0.15f;
+
+            if (keyMaterialInstance != null)
+            {
+                keyMaterialInstance.color = confirmedColor;
+            }
+
+            if (pointerTip != null)
+            {
+                pointerTip.SendHapticImpulse(0.85f, 0.07f);
+            }
+
+            // Emit the key event
+            VirtualKeyboardController.TriggerKeyPressed(this);
+        }
+
+        public void SetHighlight(bool highlight)
+        {
+            isHighlighted = highlight;
+            UpdateVisualColor();
+        }
+
+        private void UpdateVisualColor()
+        {
+            if (keyMaterialInstance == null) return;
+
+            if (confirmFlashTimer > 0f)
+            {
+                keyMaterialInstance.color = confirmedColor;
+            }
+            else if (isHovered)
+            {
+                keyMaterialInstance.color = hoverColor;
+            }
+            else if (isHighlighted)
+            {
+                keyMaterialInstance.color = highlightColor;
+            }
+            else
+            {
+                keyMaterialInstance.color = normalColor;
+            }
         }
     }
 }

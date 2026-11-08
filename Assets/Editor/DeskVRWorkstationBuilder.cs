@@ -24,8 +24,15 @@ namespace DeskVR.Editor
             SetSceneAsDefaultBuildScene(MainScenePath);
 
             EditorUtility.DisplayDialog(
-                "DeskVR - Escena Lista",
-                "¡Estación completa y Estudio Luminoso configurados en DeskVR_Main!\n\n• Habitación de estudio moderna bien iluminada (4 focos de techo + lámpara)\n• Piso de madera cálida, ventana con luz de día y repisa\n• Teclado 3D interactivo con teclas QWERTY\n• Mouse 3D físico con físicas y hápticos\n• Ventana arrastrable de Bloc de Notas en pantalla\n• Sin silla que estorbe al usuario\n\n¡Dale a Play ▶️ para probar con tus Quest 2!",
+                "DeskVR - Escena Lista (DIX09 / DIX10)",
+                "¡Estación completa y Estudio Luminoso actualizados en DeskVR_Main!\n\n" +
+                "• Teclado 3D ampliado (+30%) con letras GRANDES y NEGRAS de alta visibilidad\n" +
+                "• Confirmación con GATILLO: La tecla se hunde al tocarla y se escribe al pulsar el gatillo\n" +
+                "• Selección única: Puntero reducido (7mm) para evitar pulsar múltiples teclas a la vez\n" +
+                "• Módulo pedagógico DIX09 con flujo de 2 pasos ('Escribe HOLA' y corrección de 'A')\n" +
+                "• Feedback textual accesible DIX10 (apto sin audio y para mano no dominante)\n" +
+                "• Símbolos claros en teclas especiales: 'Borrar ⌫', 'Intro ↵', 'Espacio ␣'\n\n" +
+                "¡Dale a Play ▶️ para probar con tus Quest 2!",
                 "¡Excelente!"
             );
         }
@@ -244,7 +251,10 @@ namespace DeskVR.Editor
             txtIcon.color = Color.white;
 
             // 6d. Notepad Window
-            BuildNotepadWindow(canvasGO.transform, iconBtn);
+            TextEditorApp editorApp = BuildNotepadWindow(canvasGO.transform, iconBtn);
+
+            // 6e. Pedagogical Guide Panel (DIX09 & DIX10)
+            BuildPedagogicalGuidePanel(canvasGO.transform, editorApp);
 
             // Find and tag VR Camera
             Camera vrCam = FindAndTagVRCamera();
@@ -586,7 +596,7 @@ namespace DeskVR.Editor
             }
         }
 
-        private static void BuildNotepadWindow(Transform canvasTransform, Button triggerIconBtn)
+        private static TextEditorApp BuildNotepadWindow(Transform canvasTransform, Button triggerIconBtn)
         {
             GameObject winGO = new GameObject("Window_BlocNotas", typeof(RectTransform), typeof(Image));
             winGO.transform.SetParent(canvasTransform, false);
@@ -594,8 +604,8 @@ namespace DeskVR.Editor
             winRect.anchorMin = new Vector2(0.5f, 0.5f);
             winRect.anchorMax = new Vector2(0.5f, 0.5f);
             winRect.pivot = new Vector2(0.5f, 0.5f);
-            winRect.anchoredPosition = new Vector2(80f, 30f);
-            winRect.sizeDelta = new Vector2(740f, 480f);
+            winRect.anchoredPosition = new Vector2(-220f, 25f);
+            winRect.sizeDelta = new Vector2(900f, 620f);
             winGO.GetComponent<Image>().color = new Color(0.92f, 0.93f, 0.95f);
 
             VirtualWindow vWin = winGO.AddComponent<VirtualWindow>();
@@ -668,7 +678,7 @@ namespace DeskVR.Editor
             displayText.text = "";
             displayText.alignment = TextAnchor.UpperLeft;
             displayText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            displayText.fontSize = 24;
+            displayText.fontSize = 26;
             displayText.color = new Color(0.1f, 0.12f, 0.16f);
 
             GameObject phGO = new GameObject("Placeholder", typeof(RectTransform), typeof(Text));
@@ -707,13 +717,294 @@ namespace DeskVR.Editor
             }
 
             vWin.Open();
+            return editorApp;
+        }
+
+        private static void BuildPedagogicalGuidePanel(Transform canvasTransform, TextEditorApp editorApp)
+        {
+            GameObject guideGO = new GameObject("Panel_PedagogicalGuide", typeof(RectTransform), typeof(Image));
+            guideGO.transform.SetParent(canvasTransform, false);
+            RectTransform guideRect = guideGO.GetComponent<RectTransform>();
+            guideRect.anchorMin = new Vector2(0.5f, 0.5f);
+            guideRect.anchorMax = new Vector2(0.5f, 0.5f);
+            guideRect.pivot = new Vector2(0.5f, 0.5f);
+            guideRect.anchoredPosition = new Vector2(480f, 25f);
+            guideRect.sizeDelta = new Vector2(460f, 620f);
+            guideGO.GetComponent<Image>().color = new Color(0.95f, 0.96f, 0.98f);
+
+            // Title / Header
+            GameObject header = new GameObject("HeaderBar", typeof(RectTransform), typeof(Image));
+            header.transform.SetParent(guideGO.transform, false);
+            RectTransform headerRect = header.GetComponent<RectTransform>();
+            headerRect.anchorMin = new Vector2(0f, 1f);
+            headerRect.anchorMax = new Vector2(1f, 1f);
+            headerRect.pivot = new Vector2(0.5f, 1f);
+            headerRect.anchoredPosition = Vector2.zero;
+            headerRect.sizeDelta = new Vector2(0f, 48f);
+            header.GetComponent<Image>().color = new Color(0.12f, 0.20f, 0.32f);
+
+            GameObject headerTextGO = new GameObject("HeaderText", typeof(RectTransform), typeof(Text));
+            headerTextGO.transform.SetParent(header.transform, false);
+            RectTransform htRect = headerTextGO.GetComponent<RectTransform>();
+            htRect.anchorMin = Vector2.zero;
+            htRect.anchorMax = Vector2.one;
+            htRect.offsetMin = new Vector2(14f, 0f);
+            htRect.offsetMax = new Vector2(-14f, 0f);
+            Text ht = headerTextGO.GetComponent<Text>();
+            ht.text = "🎯 GUÍA DE PRÁCTICA · DIX09 / DIX10";
+            ht.alignment = TextAnchor.MiddleLeft;
+            ht.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            ht.fontSize = 20;
+            ht.fontStyle = FontStyle.Bold;
+            ht.color = Color.white;
+
+            // Step Badge
+            GameObject stepBadgeGO = new GameObject("StepBadge", typeof(RectTransform), typeof(Image));
+            stepBadgeGO.transform.SetParent(guideGO.transform, false);
+            RectTransform badgeRect = stepBadgeGO.GetComponent<RectTransform>();
+            badgeRect.anchorMin = new Vector2(0.5f, 1f);
+            badgeRect.anchorMax = new Vector2(0.5f, 1f);
+            badgeRect.pivot = new Vector2(0.5f, 1f);
+            badgeRect.anchoredPosition = new Vector2(0f, -60f);
+            badgeRect.sizeDelta = new Vector2(380f, 32f);
+            stepBadgeGO.GetComponent<Image>().color = new Color(0.85f, 0.91f, 1.0f);
+
+            GameObject badgeTextGO = new GameObject("BadgeText", typeof(RectTransform), typeof(Text));
+            badgeTextGO.transform.SetParent(stepBadgeGO.transform, false);
+            RectTransform btRect = badgeTextGO.GetComponent<RectTransform>();
+            btRect.anchorMin = Vector2.zero;
+            btRect.anchorMax = Vector2.one;
+            btRect.sizeDelta = Vector2.zero;
+            Text bt = badgeTextGO.GetComponent<Text>();
+            bt.text = "PASO 1 DE 2 · ESCRITURA";
+            bt.alignment = TextAnchor.MiddleCenter;
+            bt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            bt.fontSize = 18;
+            bt.fontStyle = FontStyle.Bold;
+            bt.color = new Color(0.12f, 0.45f, 0.95f);
+
+            // Main Instruction
+            GameObject mainInstGO = new GameObject("MainInstruction", typeof(RectTransform), typeof(Text));
+            mainInstGO.transform.SetParent(guideGO.transform, false);
+            RectTransform miRect = mainInstGO.GetComponent<RectTransform>();
+            miRect.anchorMin = new Vector2(0f, 1f);
+            miRect.anchorMax = new Vector2(1f, 1f);
+            miRect.pivot = new Vector2(0.5f, 1f);
+            miRect.anchoredPosition = new Vector2(0f, -100f);
+            miRect.sizeDelta = new Vector2(-28f, 55f);
+            Text mainInst = mainInstGO.GetComponent<Text>();
+            mainInst.text = "Escribe \"HOLA\" en el Bloc de Notas";
+            mainInst.alignment = TextAnchor.MiddleCenter;
+            mainInst.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            mainInst.fontSize = 24;
+            mainInst.fontStyle = FontStyle.Bold;
+            mainInst.color = new Color(0.10f, 0.12f, 0.16f);
+
+            // Sub Instruction
+            GameObject subInstGO = new GameObject("SubInstruction", typeof(RectTransform), typeof(Text));
+            subInstGO.transform.SetParent(guideGO.transform, false);
+            RectTransform siRect = subInstGO.GetComponent<RectTransform>();
+            siRect.anchorMin = new Vector2(0f, 1f);
+            siRect.anchorMax = new Vector2(1f, 1f);
+            siRect.pivot = new Vector2(0.5f, 1f);
+            siRect.anchoredPosition = new Vector2(0f, -155f);
+            siRect.sizeDelta = new Vector2(-28f, 32f);
+            Text subInst = subInstGO.GetComponent<Text>();
+            subInst.text = "Siguiente letra a pulsar: [H]";
+            subInst.alignment = TextAnchor.MiddleCenter;
+            subInst.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            subInst.fontSize = 18;
+            subInst.color = new Color(0.35f, 0.38f, 0.44f);
+
+            // Letter Slots Container (H O L A)
+            GameObject slotsRoot = new GameObject("SlotsContainer", typeof(RectTransform));
+            slotsRoot.transform.SetParent(guideGO.transform, false);
+            RectTransform srRect = slotsRoot.GetComponent<RectTransform>();
+            srRect.anchorMin = new Vector2(0.5f, 1f);
+            srRect.anchorMax = new Vector2(0.5f, 1f);
+            srRect.pivot = new Vector2(0.5f, 1f);
+            srRect.anchoredPosition = new Vector2(0f, -195f);
+            srRect.sizeDelta = new Vector2(340f, 75f);
+
+            Text[] slotTexts = new Text[4];
+            Image[] slotBgs = new Image[4];
+            string[] letters = { "H", "O", "L", "A" };
+            float slotWidth = 65f;
+            float slotSpacing = 16f;
+            float startSlotX = -((4 * slotWidth + 3 * slotSpacing) * 0.5f) + (slotWidth * 0.5f);
+
+            for (int i = 0; i < 4; i++)
+            {
+                GameObject slotGO = new GameObject($"Slot_{letters[i]}", typeof(RectTransform), typeof(Image));
+                slotGO.transform.SetParent(slotsRoot.transform, false);
+                RectTransform slotRect = slotGO.GetComponent<RectTransform>();
+                slotRect.anchorMin = new Vector2(0.5f, 0.5f);
+                slotRect.anchorMax = new Vector2(0.5f, 0.5f);
+                slotRect.pivot = new Vector2(0.5f, 0.5f);
+                slotRect.anchoredPosition = new Vector2(startSlotX + i * (slotWidth + slotSpacing), 0f);
+                slotRect.sizeDelta = new Vector2(slotWidth, 68f);
+                Image slotImg = slotGO.GetComponent<Image>();
+                slotImg.color = new Color(0.88f, 0.90f, 0.94f);
+                slotBgs[i] = slotImg;
+
+                GameObject slotTextGO = new GameObject("Letter", typeof(RectTransform), typeof(Text));
+                slotTextGO.transform.SetParent(slotGO.transform, false);
+                RectTransform stRect = slotTextGO.GetComponent<RectTransform>();
+                stRect.anchorMin = Vector2.zero;
+                stRect.anchorMax = Vector2.one;
+                stRect.sizeDelta = Vector2.zero;
+                Text st = slotTextGO.GetComponent<Text>();
+                st.text = letters[i];
+                st.alignment = TextAnchor.MiddleCenter;
+                st.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                st.fontSize = 32;
+                st.fontStyle = FontStyle.Bold;
+                st.color = new Color(0.20f, 0.22f, 0.28f);
+                slotTexts[i] = st;
+            }
+
+            // Feedback Banner (DIX10 Accessible Visual Feedback)
+            GameObject bannerGO = new GameObject("AccessibilityBanner", typeof(RectTransform), typeof(Image));
+            bannerGO.transform.SetParent(guideGO.transform, false);
+            RectTransform bannerRect = bannerGO.GetComponent<RectTransform>();
+            bannerRect.anchorMin = new Vector2(0.5f, 1f);
+            bannerRect.anchorMax = new Vector2(0.5f, 1f);
+            bannerRect.pivot = new Vector2(0.5f, 1f);
+            bannerRect.anchoredPosition = new Vector2(0f, -285f);
+            bannerRect.sizeDelta = new Vector2(410f, 90f);
+            Image bannerImg = bannerGO.GetComponent<Image>();
+            bannerImg.color = new Color(0.14f, 0.18f, 0.26f, 0.95f);
+
+            GameObject bannerTextGO = new GameObject("BannerText", typeof(RectTransform), typeof(Text));
+            bannerTextGO.transform.SetParent(bannerGO.transform, false);
+            RectTransform btTextRect = bannerTextGO.GetComponent<RectTransform>();
+            btTextRect.anchorMin = Vector2.zero;
+            btTextRect.anchorMax = Vector2.one;
+            btTextRect.offsetMin = new Vector2(16f, 8f);
+            btTextRect.offsetMax = new Vector2(-16f, -8f);
+            Text bannerText = bannerTextGO.GetComponent<Text>();
+            bannerText.text = "💡 Usa la punta de tu control para tocar las teclas en la mesa.";
+            bannerText.alignment = TextAnchor.MiddleCenter;
+            bannerText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            bannerText.fontSize = 18;
+            bannerText.fontStyle = FontStyle.Bold;
+            bannerText.color = Color.white;
+
+            // Buttons Container (Pista, Reiniciar)
+            GameObject btnsRoot = new GameObject("ButtonsRow", typeof(RectTransform));
+            btnsRoot.transform.SetParent(guideGO.transform, false);
+            RectTransform brRect = btnsRoot.GetComponent<RectTransform>();
+            brRect.anchorMin = new Vector2(0.5f, 1f);
+            brRect.anchorMax = new Vector2(0.5f, 1f);
+            brRect.pivot = new Vector2(0.5f, 1f);
+            brRect.anchoredPosition = new Vector2(0f, -395f);
+            brRect.sizeDelta = new Vector2(410f, 50f);
+
+            // Hint Button
+            GameObject hintBtnGO = new GameObject("Btn_Hint", typeof(RectTransform), typeof(Image), typeof(Button));
+            hintBtnGO.transform.SetParent(btnsRoot.transform, false);
+            RectTransform hintRect = hintBtnGO.GetComponent<RectTransform>();
+            hintRect.anchorMin = new Vector2(0f, 0.5f);
+            hintRect.anchorMax = new Vector2(0f, 0.5f);
+            hintRect.pivot = new Vector2(0f, 0.5f);
+            hintRect.anchoredPosition = new Vector2(0f, 0f);
+            hintRect.sizeDelta = new Vector2(195f, 46f);
+            hintBtnGO.GetComponent<Image>().color = new Color(0.12f, 0.45f, 0.85f);
+            Button hintBtn = hintBtnGO.GetComponent<Button>();
+
+            GameObject hintTextGO = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            hintTextGO.transform.SetParent(hintBtnGO.transform, false);
+            RectTransform htr = hintTextGO.GetComponent<RectTransform>();
+            htr.anchorMin = Vector2.zero;
+            htr.anchorMax = Vector2.one;
+            htr.sizeDelta = Vector2.zero;
+            Text hintTxt = hintTextGO.GetComponent<Text>();
+            hintTxt.text = "💡 Ver Pista";
+            hintTxt.alignment = TextAnchor.MiddleCenter;
+            hintTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            hintTxt.fontSize = 18;
+            hintTxt.fontStyle = FontStyle.Bold;
+            hintTxt.color = Color.white;
+
+            // Restart Button
+            GameObject restartBtnGO = new GameObject("Btn_Restart", typeof(RectTransform), typeof(Image), typeof(Button));
+            restartBtnGO.transform.SetParent(btnsRoot.transform, false);
+            RectTransform restRect = restartBtnGO.GetComponent<RectTransform>();
+            restRect.anchorMin = new Vector2(1f, 0.5f);
+            restRect.anchorMax = new Vector2(1f, 0.5f);
+            restRect.pivot = new Vector2(1f, 0.5f);
+            restRect.anchoredPosition = new Vector2(0f, 0f);
+            restRect.sizeDelta = new Vector2(195f, 46f);
+            restartBtnGO.GetComponent<Image>().color = new Color(0.18f, 0.58f, 0.32f);
+            Button restartBtn = restartBtnGO.GetComponent<Button>();
+
+            GameObject restTextGO = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            restTextGO.transform.SetParent(restartBtnGO.transform, false);
+            RectTransform rtr = restTextGO.GetComponent<RectTransform>();
+            rtr.anchorMin = Vector2.zero;
+            rtr.anchorMax = Vector2.one;
+            rtr.sizeDelta = Vector2.zero;
+            Text restTxt = restTextGO.GetComponent<Text>();
+            restTxt.text = "🔄 Repetir práctica";
+            restTxt.alignment = TextAnchor.MiddleCenter;
+            restTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            restTxt.fontSize = 18;
+            restTxt.fontStyle = FontStyle.Bold;
+            restTxt.color = Color.white;
+
+            // Accessibility Info Card (Bottom)
+            GameObject infoCardGO = new GameObject("InfoCard", typeof(RectTransform), typeof(Image));
+            infoCardGO.transform.SetParent(guideGO.transform, false);
+            RectTransform icRect = infoCardGO.GetComponent<RectTransform>();
+            icRect.anchorMin = new Vector2(0.5f, 0f);
+            icRect.anchorMax = new Vector2(0.5f, 0f);
+            icRect.pivot = new Vector2(0.5f, 0f);
+            icRect.anchoredPosition = new Vector2(0f, 18f);
+            icRect.sizeDelta = new Vector2(410f, 130f);
+            infoCardGO.GetComponent<Image>().color = new Color(0.90f, 0.92f, 0.95f);
+
+            GameObject infoTextGO = new GameObject("InfoText", typeof(RectTransform), typeof(Text));
+            infoTextGO.transform.SetParent(infoCardGO.transform, false);
+            RectTransform itRect = infoTextGO.GetComponent<RectTransform>();
+            itRect.anchorMin = Vector2.zero;
+            itRect.anchorMax = Vector2.one;
+            itRect.offsetMin = new Vector2(14f, 10f);
+            itRect.offsetMax = new Vector2(-14f, -10f);
+            Text infoTxt = infoTextGO.GetComponent<Text>();
+            infoTxt.text = "<b>Criterios DIX09 & DIX10:</b>\n• Pistas visuales accesibles (apto sin audio)\n• Teclado ampliado con etiquetas de alta visibilidad\n• Tolerancia a errores: corrección asistida con <b>[Borrar ⌫]</b> sin castigo ni reinicio forzado.";
+            infoTxt.alignment = TextAnchor.MiddleLeft;
+            infoTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            infoTxt.fontSize = 15;
+            infoTxt.color = new Color(0.25f, 0.28f, 0.35f);
+
+            // Attach DeskVRPedagogicalGuide component
+            DeskVRPedagogicalGuide guideComp = guideGO.AddComponent<DeskVRPedagogicalGuide>();
+            SerializedObject so = new SerializedObject(guideComp);
+            so.FindProperty("textEditor").objectReferenceValue = editorApp;
+            so.FindProperty("stepBadgeText").objectReferenceValue = bt;
+            so.FindProperty("mainInstructionText").objectReferenceValue = mainInst;
+            so.FindProperty("subInstructionText").objectReferenceValue = subInst;
+            so.FindProperty("feedbackBannerText").objectReferenceValue = bannerText;
+            so.FindProperty("feedbackBannerBg").objectReferenceValue = bannerImg;
+            so.FindProperty("restartBtn").objectReferenceValue = restartBtn;
+            so.FindProperty("hintBtn").objectReferenceValue = hintBtn;
+
+            SerializedProperty slotsTextProp = so.FindProperty("letterSlotTexts");
+            slotsTextProp.arraySize = 4;
+            for (int i = 0; i < 4; i++) slotsTextProp.GetArrayElementAtIndex(i).objectReferenceValue = slotTexts[i];
+
+            SerializedProperty slotsBgProp = so.FindProperty("letterSlotBgs");
+            slotsBgProp.arraySize = 4;
+            for (int i = 0; i < 4; i++) slotsBgProp.GetArrayElementAtIndex(i).objectReferenceValue = slotBgs[i];
+
+            so.ApplyModifiedProperties();
         }
 
         private static void BuildVirtualKeyboard(Transform parent, Material chassisMat, Material keyMat, Material specialKeyMat)
         {
             GameObject kbRoot = new GameObject("VirtualKeyboard");
             kbRoot.transform.SetParent(parent, false);
-            kbRoot.transform.position = new Vector3(-0.06f, 0.748f, 0.58f);
+            kbRoot.transform.position = new Vector3(-0.15f, 0.748f, 0.56f);
             kbRoot.transform.rotation = Quaternion.Euler(4f, 0f, 0f);
 
             var kbRb = kbRoot.AddComponent<Rigidbody>();
@@ -722,11 +1013,12 @@ namespace DeskVR.Editor
 
             kbRoot.AddComponent<VirtualKeyboardController>();
 
+            // 30% Enlarged Chassis for high ergonomics and accessibility
             GameObject chassis = GameObject.CreatePrimitive(PrimitiveType.Cube);
             chassis.name = "Keyboard_Chassis";
             chassis.transform.SetParent(kbRoot.transform, false);
             chassis.transform.localPosition = Vector3.zero;
-            chassis.transform.localScale = new Vector3(0.40f, 0.012f, 0.15f);
+            chassis.transform.localScale = new Vector3(0.52f, 0.014f, 0.195f);
             chassis.GetComponent<MeshRenderer>().sharedMaterial = chassisMat;
 
             var row0 = new (string, string, KeyActionType, float)[]
@@ -741,7 +1033,7 @@ namespace DeskVR.Editor
                 ("8", "8", KeyActionType.Character, 1f),
                 ("9", "9", KeyActionType.Character, 1f),
                 ("0", "0", KeyActionType.Character, 1f),
-                ("Borrar", "", KeyActionType.Backspace, 1.8f)
+                ("Borrar ⌫", "", KeyActionType.Backspace, 2.0f)
             };
 
             var row1 = new (string, string, KeyActionType, float)[]
@@ -769,7 +1061,7 @@ namespace DeskVR.Editor
                 ("J", "J", KeyActionType.Character, 1f),
                 ("K", "K", KeyActionType.Character, 1f),
                 ("L", "L", KeyActionType.Character, 1f),
-                ("Enter", "\n", KeyActionType.Enter, 1.9f)
+                ("Intro ↵", "\n", KeyActionType.Enter, 2.0f)
             };
 
             var row3 = new (string, string, KeyActionType, float)[]
@@ -787,16 +1079,18 @@ namespace DeskVR.Editor
 
             var row4 = new (string, string, KeyActionType, float)[]
             {
-                ("Espacio", " ", KeyActionType.Space, 6.2f)
+                ("Espacio ␣", " ", KeyActionType.Space, 6.5f)
             };
 
             var allRows = new[] { row0, row1, row2, row3, row4 };
 
-            float startZ = 0.052f;
-            float rowSpacing = 0.026f;
-            float standardKeyWidth = 0.026f;
-            float keyHeight = 0.008f;
-            float keyDepth = 0.022f;
+            // Enlarged key parameters (+30% dimension)
+            float startZ = 0.068f;
+            float rowSpacing = 0.034f;
+            float standardKeyWidth = 0.034f;
+            float keyHeight = 0.010f;
+            float keyDepth = 0.028f;
+            float keyGap = 0.005f;
 
             for (int r = 0; r < allRows.Length; r++)
             {
@@ -806,7 +1100,7 @@ namespace DeskVR.Editor
                 float totalRowWidth = 0f;
                 foreach (var k in row)
                 {
-                    totalRowWidth += (standardKeyWidth * k.Item4) + 0.004f;
+                    totalRowWidth += (standardKeyWidth * k.Item4) + keyGap;
                 }
                 float currentX = -totalRowWidth * 0.5f;
 
@@ -816,11 +1110,11 @@ namespace DeskVR.Editor
                     float posX = currentX + (width * 0.5f);
 
                     CreateKeyObject(kbRoot.transform, keyDef.Item1, keyDef.Item2, keyDef.Item3,
-                        new Vector3(posX, 0.008f, currentZ),
+                        new Vector3(posX, 0.010f, currentZ),
                         new Vector3(width, keyHeight, keyDepth),
                         keyDef.Item3 == KeyActionType.Character ? keyMat : specialKeyMat);
 
-                    currentX += width + 0.004f;
+                    currentX += width + keyGap;
                 }
             }
         }
@@ -842,14 +1136,22 @@ namespace DeskVR.Editor
 
             GameObject labelCanvas = new GameObject("LabelCanvas");
             labelCanvas.transform.SetParent(keyGO.transform, false);
-            labelCanvas.transform.localPosition = new Vector3(0f, 0.52f, 0f);
+            // Position 0.56f is slightly above key top face (0.5f) to avoid any z-fighting
+            labelCanvas.transform.localPosition = new Vector3(0f, 0.56f, 0f);
             labelCanvas.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            labelCanvas.transform.localScale = new Vector3(0.0025f, 0.0025f, 0.0025f);
 
             Canvas c = labelCanvas.AddComponent<Canvas>();
             c.renderMode = RenderMode.WorldSpace;
             RectTransform rt = labelCanvas.GetComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(100f, 80f);
+
+            // Clean aspect-ratio preserving dimensions in canvas pixel space
+            float widthRatio = localScale.x / 0.034f;
+            float canvasWidth = Mathf.Max(260f * widthRatio, 240f);
+            float canvasHeight = 220f;
+            rt.sizeDelta = new Vector2(canvasWidth, canvasHeight);
+
+            // Scale to occupy 88% of key top surface without distortion
+            labelCanvas.transform.localScale = new Vector3(0.88f / canvasWidth, 0.88f / canvasHeight, 0.001f);
 
             GameObject textGO = new GameObject("Text");
             textGO.transform.SetParent(labelCanvas.transform, false);
@@ -858,13 +1160,34 @@ namespace DeskVR.Editor
             textRT.anchorMax = Vector2.one;
             textRT.sizeDelta = Vector2.zero;
 
+            // Load high-clarity font
+            Font keyFont = AssetDatabase.LoadAssetAtPath<Font>("Assets/VRTemplateAssets/Fonts/Inter/Inter-Regular.ttf");
+            if (keyFont == null) keyFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (keyFont == null) keyFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
             Text txt = textGO.AddComponent<Text>();
             txt.text = label;
             txt.alignment = TextAnchor.MiddleCenter;
-            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            txt.fontSize = label.Length > 2 ? 22 : 36;
+            txt.font = keyFont;
             txt.fontStyle = FontStyle.Bold;
-            txt.color = new Color(0.12f, 0.12f, 0.15f);
+            txt.color = Color.black; // Pure solid black
+            txt.horizontalOverflow = HorizontalWrapMode.Overflow; // NEVER clip or hide
+            txt.verticalOverflow = VerticalWrapMode.Overflow;     // NEVER clip or hide
+            txt.raycastTarget = false;
+
+            // Large, clear font sizing
+            if (label.Length == 1)
+            {
+                txt.fontSize = 140; // Letters A-Z, Numbers
+            }
+            else if (label.Length <= 3)
+            {
+                txt.fontSize = 100;
+            }
+            else
+            {
+                txt.fontSize = 72; // "Borrar ⌫", "Intro ↵", "Espacio ␣"
+            }
         }
 
         private static Camera FindAndTagVRCamera()
@@ -918,12 +1241,17 @@ namespace DeskVR.Editor
                     }
 
                     // Forward tip of controller (Quest 2 natural pointing angle & reach)
-                    tipGO.transform.localPosition = new Vector3(0f, -0.015f, 0.085f);
+                    tipGO.transform.localPosition = new Vector3(0f, -0.012f, 0.080f);
                     tipGO.transform.localRotation = Quaternion.identity;
 
+                    var tipComp = tipGO.GetComponent<DeskVRPointerTip>();
+                    if (tipComp == null) tipComp = tipGO.AddComponent<DeskVRPointerTip>();
+                    tipComp.isRightHand = n.Contains("right");
+
+                    // Slim, precise fingertip collider (7mm radius instead of 20mm)
                     var col = tipGO.GetComponent<SphereCollider>();
                     if (col == null) col = tipGO.AddComponent<SphereCollider>();
-                    col.radius = 0.018f;
+                    col.radius = 0.007f;
                     col.isTrigger = true;
 
                     var rb = tipGO.GetComponent<Rigidbody>();
@@ -945,9 +1273,11 @@ namespace DeskVR.Editor
                         visualTip = visTrans.gameObject;
                     }
 
+                    // Sleek 10mm visual sphere
                     visualTip.transform.localPosition = Vector3.zero;
-                    visualTip.transform.localScale = new Vector3(0.014f, 0.014f, 0.014f);
+                    visualTip.transform.localScale = new Vector3(0.010f, 0.010f, 0.010f);
                     visualTip.GetComponent<MeshRenderer>().sharedMaterial = tipMat;
+                    tipComp.visualTip = visualTip.transform;
                 }
             }
         }
