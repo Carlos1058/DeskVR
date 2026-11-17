@@ -7,10 +7,12 @@ namespace DeskVR.Peripherals
     /// <summary>
     /// Coordinates all 3D keys on the physical virtual keyboard.
     /// Implements precise single-key direct touch interaction (touch-to-type) per controller pointer.
-    /// Touching down on a key presses it and types the letter once; holding it down does not repeat.
-    /// Lifting or moving to another key allows immediate typing again.
-    /// Completely independent per hand, with debouncing and zero trigger requirement.
-    /// Absolutely immune to VR headset / camera proximity.
+    /// Features advanced anti-chatter / hysteresis protection:
+    /// - Dual-threshold Schmitt trigger (press at y <= 0.45, release at y >= 0.65) to eliminate hand tremors
+    /// - Per-key release latch: a pressed key CANNOT trigger again until the hand visibly lifts up
+    /// - Cooldown timers (250ms same-key anti-bounce, 80ms inter-key fluid typing)
+    /// - Completely independent per hand
+    /// - 100% immune to VR headset / camera proximity
     /// </summary>
     public class VirtualKeyboardController : MonoBehaviour
     {
@@ -21,12 +23,18 @@ namespace DeskVR.Peripherals
         [SerializeField] private AudioSource audioSource;
         [SerializeField] private AudioClip keyClickSound;
 
-        [Header("Targeting Constraints")]
-        [Tooltip("Maximum distance from pointer tip to key center for contact detection (meters)")]
-        [SerializeField] private float touchRadius = 0.022f;
+        [Header("Anti-Chatter & Hysteresis Settings")]
+        [Tooltip("Minimum time (seconds) before the SAME key can fire again on the same hand")]
+        [SerializeField] private float sameKeyCooldown = 0.25f; // 250ms delay to eliminate accidental repeat taps
 
-        [Tooltip("Minimum time (seconds) between consecutive key presses on the same pointer")]
-        [SerializeField] private float debounceInterval = 0.08f;
+        [Tooltip("Minimum time (seconds) between pressing DIFFERENT keys on the same hand")]
+        [SerializeField] private float interKeyCooldown = 0.08f; // 80ms for fluid cadence between letters
+
+        [Tooltip("Height threshold for press activation (key local Y, key resting surface is at 0.50)")]
+        [SerializeField] private float pressHeightThreshold = 0.45f;
+
+        [Tooltip("Height threshold for key release (key local Y, user must lift above this to re-arm)")]
+        [SerializeField] private float releaseHeightThreshold = 0.65f;
 
         private static VirtualKeyboardController instance;
         public static VirtualKeyboardController Instance => instance;
@@ -35,11 +43,13 @@ namespace DeskVR.Peripherals
         private readonly Dictionary<string, VirtualKey> keyLookup = new Dictionary<string, VirtualKey>(StringComparer.OrdinalIgnoreCase);
 
         private readonly List<DeskVRPointerTip> activePointers = new List<DeskVRPointerTip>();
-        private readonly HashSet<VirtualKey> targetedKeysThisFrame = new HashSet<VirtualKey>();
+        private readonly HashSet<VirtualKey> depressedKeysThisFrame = new HashSet<VirtualKey>();
 
-        // Per-pointer press tracking: which key is currently being touched down by each pointer
+        // Per-pointer press & latch tracking
         private readonly Dictionary<DeskVRPointerTip, VirtualKey> pointerCurrentKey = new Dictionary<DeskVRPointerTip, VirtualKey>();
+        private readonly Dictionary<DeskVRPointerTip, VirtualKey> pointerLatchedKey = new Dictionary<DeskVRPointerTip, VirtualKey>();
         private readonly Dictionary<DeskVRPointerTip, float> pointerLastTypeTime = new Dictionary<DeskVRPointerTip, float>();
+        private readonly Dictionary<VirtualKey, float> keyLastPressTime = new Dictionary<VirtualKey, float>();
 
         // Procedural audio for key click (fallback when no AudioClip assigned)
         private AudioClip proceduralClickClip;
@@ -120,7 +130,7 @@ namespace DeskVR.Peripherals
             activePointers.Clear();
 
             // Find all authorized DeskVRPointerTip components (created on left & right controllers)
-            var taggedTips = FindObjectsByType<DeskVRPointerTip>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            var taggedTips = FindObjectsByType<DeskVRPointerTip>(FindObjectsInactive.Exclude);
             foreach (var tip in taggedTips)
             {
                 // Absolute safeguard: Never evaluate headset / camera position
@@ -139,7 +149,7 @@ namespace DeskVR.Peripherals
                 if (activePointers.Count == 0) return;
             }
 
-            targetedKeysThisFrame.Clear();
+            depressedKeysThisFrame.Clear();
 
             // Process each pointer (left hand, right hand)
             for (int p = 0; p < activePointers.Count; p++)
@@ -149,9 +159,25 @@ namespace DeskVR.Peripherals
 
                 Vector3 tipPos = pointer.transform.position;
 
-                // Find the SINGLE closest key to this pointer tip
+                // 1. Check if previously latched key can be unlatched (user lifted hand above release height or moved away)
+                if (pointerLatchedKey.TryGetValue(pointer, out VirtualKey latchedKey) && latchedKey != null)
+                {
+                    Vector3 latchedLocal = latchedKey.transform.InverseTransformPoint(tipPos);
+                    bool outsideFootprint = Mathf.Abs(latchedLocal.x) > 0.60f || Mathf.Abs(latchedLocal.z) > 0.60f;
+                    bool liftedAboveRelease = latchedLocal.y > releaseHeightThreshold;
+
+                    if (liftedAboveRelease || outsideFootprint)
+                    {
+                        // User has clearly lifted or moved away: unlatch so key can be typed again
+                        pointerLatchedKey[pointer] = null;
+                        latchedKey = null;
+                    }
+                }
+
+                // 2. Find the SINGLE closest key to this pointer tip
                 VirtualKey closestKey = null;
                 float closestDistSq = float.MaxValue;
+                bool isWithinPressZone = false;
 
                 for (int i = 0; i < allKeys.Count; i++)
                 {
@@ -160,19 +186,20 @@ namespace DeskVR.Peripherals
 
                     Vector3 localTip = key.transform.InverseTransformPoint(tipPos);
 
-                    // Precise footprint: half-extents are [-0.5, 0.5] along X and Z
-                    bool insideFootprint = Mathf.Abs(localTip.x) <= 0.55f && Mathf.Abs(localTip.z) <= 0.55f;
-                    // Contact height window: key top is at Y = 0.5; contact depress is [-0.35, 0.65]
-                    bool withinPressHeight = localTip.y >= -0.35f && localTip.y <= 0.65f;
+                    // Horizontal footprint check
+                    bool insideFootprint = Mathf.Abs(localTip.x) <= 0.52f && Mathf.Abs(localTip.z) <= 0.52f;
+                    // Contact height window (from below key up to release threshold)
+                    bool insideContactHeight = localTip.y >= -0.80f && localTip.y <= releaseHeightThreshold;
 
-                    float distSq = (tipPos - key.transform.position).sqrMagnitude;
-
-                    if ((insideFootprint && withinPressHeight) || (distSq < touchRadius * touchRadius))
+                    if (insideFootprint && insideContactHeight)
                     {
+                        float distSq = (tipPos - key.transform.position).sqrMagnitude;
                         if (distSq < closestDistSq)
                         {
                             closestDistSq = distSq;
                             closestKey = key;
+                            // Tip has pushed down into the press threshold (below resting surface 0.50)
+                            isWithinPressZone = localTip.y <= pressHeightThreshold;
                         }
                     }
                 }
@@ -180,43 +207,56 @@ namespace DeskVR.Peripherals
                 // Update laser visual state
                 pointer.SetHoveringKey(closestKey != null);
 
-                // Get state for this specific pointer
-                pointerCurrentKey.TryGetValue(pointer, out VirtualKey currentKeyForPointer);
-                pointerLastTypeTime.TryGetValue(pointer, out float lastPressTime);
+                // 3. Process key press with anti-chatter hysteresis & latching
+                pointerLatchedKey.TryGetValue(pointer, out latchedKey);
+                pointerLastTypeTime.TryGetValue(pointer, out float lastPointerTime);
 
                 if (closestKey != null)
                 {
-                    targetedKeysThisFrame.Add(closestKey);
+                    pointerCurrentKey[pointer] = closestKey;
 
-                    // DIRECT TOUCH-TO-TYPE:
-                    // Trigger key ONLY when pointer transitions into a new key
-                    if (currentKeyForPointer != closestKey)
+                    // Physically depress key if in press zone or latched
+                    if (isWithinPressZone || latchedKey == closestKey)
                     {
-                        if (Time.time - lastPressTime >= debounceInterval)
+                        depressedKeysThisFrame.Add(closestKey);
+                    }
+
+                    // Trigger key ONLY if:
+                    // a) Tip has penetrated into the press zone (y <= pressHeightThreshold)
+                    // b) This key is NOT already latched on this pointer (must lift up to re-arm)
+                    if (isWithinPressZone && latchedKey != closestKey)
+                    {
+                        keyLastPressTime.TryGetValue(closestKey, out float lastKeyTime);
+
+                        bool cooldownPassed = (Time.time - lastPointerTime >= interKeyCooldown) &&
+                                              (Time.time - lastKeyTime >= sameKeyCooldown);
+
+                        if (cooldownPassed)
                         {
-                            pointerCurrentKey[pointer] = closestKey;
+                            // Latch immediately to lock out any tremors or micro-bounces
+                            pointerLatchedKey[pointer] = closestKey;
                             pointerLastTypeTime[pointer] = Time.time;
+                            keyLastPressTime[closestKey] = Time.time;
+
                             closestKey.Press(pointer);
                         }
                     }
                 }
                 else
                 {
-                    // Pointer lifted or exited key: clear held state so user can press again
-                    if (currentKeyForPointer != null)
-                    {
-                        pointerCurrentKey[pointer] = null;
-                    }
+                    // Pointer is in the air: clear contact state
+                    pointerCurrentKey[pointer] = null;
+                    pointerLatchedKey[pointer] = null;
                 }
             }
 
-            // Update physical depression state for all keys
+            // 4. Update physical depression state for all keys
             for (int i = 0; i < allKeys.Count; i++)
             {
                 var key = allKeys[i];
                 if (key != null)
                 {
-                    key.SetDepressed(targetedKeysThisFrame.Contains(key));
+                    key.SetDepressed(depressedKeysThisFrame.Contains(key));
                 }
             }
         }
@@ -258,9 +298,10 @@ namespace DeskVR.Peripherals
 
         public void ClearAllHighlights()
         {
-            foreach (var kvp in keyLookup)
+            for (int i = 0; i < allKeys.Count; i++)
             {
-                kvp.Value.SetHighlight(false);
+                var key = allKeys[i];
+                if (key != null) key.SetHighlight(false);
             }
         }
     }
