@@ -9,7 +9,8 @@ namespace DeskVR.Peripherals
 {
     /// <summary>
     /// Explicit pointer tip attached to each VR controller.
-    /// Provides accurate index-trigger (gatillo) detection and localized haptic feedback.
+    /// Provides accurate index-trigger (gatillo) detection, localized haptic feedback,
+    /// and a visual laser/line renderer from the controller tip for targeting guidance.
     /// Supports Unity Input System, XR Interaction Toolkit, and universal OpenXR / InputDevices.
     /// </summary>
     [DisallowMultipleComponent]
@@ -21,12 +22,135 @@ namespace DeskVR.Peripherals
         [Tooltip("Visual pointer tip transform")]
         public Transform visualTip;
 
+        [Header("Laser Line Settings")]
+        [Tooltip("Enable the pointer laser line from controller tip")]
+        public bool showLaser = true;
+
+        [Tooltip("Length of the laser beam in meters")]
+        public float laserLength = 0.08f;
+
+        [Tooltip("Width of the laser line")]
+        public float laserWidth = 0.0025f;
+
+        [Tooltip("Laser color when idle (not hovering a key)")]
+        public Color laserIdleColor = new Color(0.3f, 0.75f, 1.0f, 0.65f);
+
+        [Tooltip("Laser color when hovering over a key")]
+        public Color laserActiveColor = new Color(0.1f, 0.95f, 0.5f, 0.90f);
+
         private XRBaseInputInteractor cachedInteractor;
         private bool wasTriggerPressedLastFrame = false;
+        private LineRenderer laserLine;
+        private bool isHoveringKey = false;
+
+        // Glow pulse state
+        private float glowPulsePhase = 0f;
 
         private void Awake()
         {
             cachedInteractor = GetComponentInParent<XRBaseInputInteractor>();
+            SetupLaserLine();
+        }
+
+        private void Update()
+        {
+            UpdateLaser();
+        }
+
+        /// <summary>
+        /// Sets up the LineRenderer for the laser pointer effect.
+        /// </summary>
+        private void SetupLaserLine()
+        {
+            if (!showLaser) return;
+
+            laserLine = GetComponent<LineRenderer>();
+            if (laserLine == null)
+            {
+                laserLine = gameObject.AddComponent<LineRenderer>();
+            }
+
+            laserLine.positionCount = 2;
+            laserLine.startWidth = laserWidth;
+            laserLine.endWidth = laserWidth * 0.3f; // Tapers to a fine point
+            laserLine.useWorldSpace = true;
+            laserLine.receiveShadows = false;
+            laserLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            laserLine.allowOcclusionWhenDynamic = false;
+            laserLine.numCapVertices = 2;
+
+            // Create a simple unlit material for the laser
+            Shader unlitShader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (unlitShader == null) unlitShader = Shader.Find("Unlit/Color");
+            if (unlitShader == null) unlitShader = Shader.Find("Sprites/Default");
+
+            Material laserMat = new Material(unlitShader);
+            laserMat.color = laserIdleColor;
+            laserMat.SetFloat("_Surface", 1f); // Transparent
+            laserMat.SetFloat("_Blend", 0f);
+            laserMat.renderQueue = 3000;
+            laserLine.material = laserMat;
+
+            // Gradient: vivid at origin, fades at tip
+            Gradient gradient = new Gradient();
+            gradient.SetKeys(
+                new GradientColorKey[] {
+                    new GradientColorKey(Color.white, 0f),
+                    new GradientColorKey(Color.white, 1f)
+                },
+                new GradientAlphaKey[] {
+                    new GradientAlphaKey(0.9f, 0f),
+                    new GradientAlphaKey(0.1f, 1f)
+                }
+            );
+            laserLine.colorGradient = gradient;
+        }
+
+        /// <summary>
+        /// Updates the laser line positions and color every frame.
+        /// </summary>
+        private void UpdateLaser()
+        {
+            if (laserLine == null || !showLaser)
+            {
+                if (laserLine != null) laserLine.enabled = false;
+                return;
+            }
+
+            laserLine.enabled = true;
+
+            Vector3 origin = transform.position;
+            Vector3 direction = transform.forward;
+            Vector3 endPoint = origin + direction * laserLength;
+
+            laserLine.SetPosition(0, origin);
+            laserLine.SetPosition(1, endPoint);
+
+            // Subtle breathing glow pulse
+            glowPulsePhase += Time.deltaTime * 3f;
+            float pulse = 0.85f + 0.15f * Mathf.Sin(glowPulsePhase);
+
+            Color currentColor = isHoveringKey ? laserActiveColor : laserIdleColor;
+            currentColor.a *= pulse;
+
+            if (laserLine.material != null)
+            {
+                laserLine.material.color = currentColor;
+            }
+
+            // Adjust width when hovering: slightly wider to signal "ready to press"
+            float targetWidth = isHoveringKey ? laserWidth * 1.6f : laserWidth;
+            laserLine.startWidth = Mathf.Lerp(laserLine.startWidth, targetWidth, Time.deltaTime * 12f);
+            laserLine.endWidth = laserLine.startWidth * 0.3f;
+        }
+
+        /// <summary>
+        /// Notifies this pointer tip whether it's currently hovering over a key.
+        /// Used by VirtualKeyboardController to change laser color.
+        /// </summary>
+        public void SetHoveringKey(bool hovering)
+        {
+            isHoveringKey = hovering;
         }
 
         /// <summary>

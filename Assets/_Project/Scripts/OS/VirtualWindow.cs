@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using TMPro;
 
 namespace DeskVR.OS
 {
@@ -15,7 +16,7 @@ namespace DeskVR.OS
         [SerializeField] private string windowTitle = "Ventana";
         [SerializeField] private RectTransform windowRect;
         [SerializeField] private RectTransform titleBarRect;
-        [SerializeField] private Text titleText;
+        [SerializeField] private TMP_Text titleText;
 
         [Header("Buttons")]
         [SerializeField] private Button closeButton;

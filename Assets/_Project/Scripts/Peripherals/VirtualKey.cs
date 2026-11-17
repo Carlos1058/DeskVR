@@ -14,7 +14,7 @@ namespace DeskVR.Peripherals
     /// <summary>
     /// Represents an individual physical 3D key on the virtual keyboard.
     /// Supports a two-phase interaction model:
-    /// 1. Physical hover/touch: Depresses visually to indicate targeting, but DOES NOT type.
+    /// 1. Physical hover/touch: Depresses visually with smooth animation, but DOES NOT type.
     /// 2. Index Trigger confirmation: Pressing the controller trigger confirms and writes the letter.
     /// </summary>
     public class VirtualKey : MonoBehaviour
@@ -26,7 +26,8 @@ namespace DeskVR.Peripherals
 
         [Header("Physical Movement")]
         [SerializeField] private float pressDepth = 0.005f; // 5mm travel distance
-        [SerializeField] private float returnSpeed = 18f;
+        [SerializeField] private float pressSpeed = 28f;    // Smooth press-down speed
+        [SerializeField] private float returnSpeed = 14f;   // Smooth return speed (slightly slower for satisfying feel)
 
         [Header("Visual Feedback Colors")]
         [SerializeField] private MeshRenderer keyRenderer;
@@ -35,12 +36,29 @@ namespace DeskVR.Peripherals
         [SerializeField] private Color confirmedColor = new Color(0.10f, 0.45f, 1.0f); // Deep vibrant blue when trigger confirms
         [SerializeField] private Color highlightColor = new Color(1.0f, 0.78f, 0.08f); // Golden glow for tutorials
 
+        [Header("Confirm Animation")]
+        [SerializeField] private float confirmBounceDepth = 0.003f;  // Extra bounce on confirm
+        [SerializeField] private float confirmBounceSpeed = 35f;
+
         private Vector3 initialLocalPos;
         private Vector3 pressedLocalPos;
+        private Vector3 confirmBouncePos;
         private bool isHovered = false;
         private bool isHighlighted = false;
         private Material keyMaterialInstance;
         private float confirmFlashTimer = 0f;
+
+        // Smooth animation state
+        private Vector3 targetPosition;
+        private float currentAnimSpeed;
+        private bool isConfirmBouncing = false;
+        private float confirmBounceTimer = 0f;
+
+        // Scale punch animation
+        private Vector3 originalScale;
+        private float scalePunchTimer = 0f;
+        private const float ScalePunchDuration = 0.12f;
+        private const float ScalePunchAmount = 0.08f; // 8% scale pulse
 
         public KeyActionType ActionType => actionType;
         public string CharacterValue => characterValue;
@@ -52,6 +70,9 @@ namespace DeskVR.Peripherals
         {
             initialLocalPos = transform.localPosition;
             pressedLocalPos = initialLocalPos - new Vector3(0f, pressDepth, 0f);
+            confirmBouncePos = pressedLocalPos - new Vector3(0f, confirmBounceDepth, 0f);
+            targetPosition = initialLocalPos;
+            originalScale = transform.localScale;
 
             if (keyRenderer == null) keyRenderer = GetComponent<MeshRenderer>();
             if (keyRenderer != null)
@@ -66,6 +87,9 @@ namespace DeskVR.Peripherals
             // Re-capture in Start in case builder configured position after Awake
             initialLocalPos = transform.localPosition;
             pressedLocalPos = initialLocalPos - new Vector3(0f, pressDepth, 0f);
+            confirmBouncePos = pressedLocalPos - new Vector3(0f, confirmBounceDepth, 0f);
+            targetPosition = initialLocalPos;
+            originalScale = transform.localScale;
         }
 
         public void Configure(KeyActionType type, string value, string label)
@@ -89,6 +113,53 @@ namespace DeskVR.Peripherals
 
         private void Update()
         {
+            // --- Smooth position animation ---
+            if (isConfirmBouncing)
+            {
+                confirmBounceTimer -= Time.deltaTime;
+                if (confirmBounceTimer > 0f)
+                {
+                    // Bounce down then return
+                    float t = 1f - (confirmBounceTimer / 0.08f);
+                    if (t < 0.5f)
+                    {
+                        // Press deeper
+                        transform.localPosition = Vector3.Lerp(transform.localPosition, confirmBouncePos, Time.deltaTime * confirmBounceSpeed);
+                    }
+                    else
+                    {
+                        // Return to pressed position
+                        transform.localPosition = Vector3.Lerp(transform.localPosition, pressedLocalPos, Time.deltaTime * confirmBounceSpeed);
+                    }
+                }
+                else
+                {
+                    isConfirmBouncing = false;
+                    // After bounce, return based on hover state
+                    targetPosition = isHovered ? pressedLocalPos : initialLocalPos;
+                }
+            }
+            else
+            {
+                // Smooth lerp toward target position
+                float speed = isHovered ? pressSpeed : returnSpeed;
+                transform.localPosition = Vector3.Lerp(transform.localPosition, targetPosition, Time.deltaTime * speed);
+            }
+
+            // --- Scale punch animation ---
+            if (scalePunchTimer > 0f)
+            {
+                scalePunchTimer -= Time.deltaTime;
+                float t = scalePunchTimer / ScalePunchDuration;
+                // Sine pulse: scale up then back
+                float punchFactor = 1f + Mathf.Sin(t * Mathf.PI) * ScalePunchAmount;
+                transform.localScale = originalScale * punchFactor;
+            }
+            else if (transform.localScale != originalScale)
+            {
+                transform.localScale = originalScale;
+            }
+
             // Handle confirmation flash decay
             if (confirmFlashTimer > 0f)
             {
@@ -98,17 +169,11 @@ namespace DeskVR.Peripherals
                     UpdateVisualColor();
                 }
             }
-
-            // Smooth physical return when not hovered
-            if (!isHovered && transform.localPosition != initialLocalPos)
-            {
-                transform.localPosition = Vector3.Lerp(transform.localPosition, initialLocalPos, Time.deltaTime * returnSpeed);
-            }
         }
 
         /// <summary>
         /// Called when an authorized pointer tip hovers over this key.
-        /// Physically depresses the key and updates hover visuals, but DOES NOT type.
+        /// Smoothly depresses the key and updates hover visuals, but DOES NOT type.
         /// </summary>
         public void SetHovered(bool hovered)
         {
@@ -118,7 +183,11 @@ namespace DeskVR.Peripherals
 
             if (isHovered)
             {
-                transform.localPosition = pressedLocalPos;
+                targetPosition = pressedLocalPos;
+            }
+            else
+            {
+                targetPosition = initialLocalPos;
             }
 
             UpdateVisualColor();
@@ -126,12 +195,17 @@ namespace DeskVR.Peripherals
 
         /// <summary>
         /// Confirms the keystroke when the user presses the Index Trigger on the controller.
-        /// Emits the character event, sends haptics, and flashes confirmed visual feedback.
+        /// Emits the character event, sends haptics, plays bounce animation, and flashes confirmed visual feedback.
         /// </summary>
         public void ConfirmPress(DeskVRPointerTip pointerTip)
         {
-            transform.localPosition = pressedLocalPos;
-            confirmFlashTimer = 0.15f;
+            // Trigger confirm bounce animation
+            isConfirmBouncing = true;
+            confirmBounceTimer = 0.08f;
+            confirmFlashTimer = 0.18f;
+
+            // Scale punch for juicy feedback
+            scalePunchTimer = ScalePunchDuration;
 
             if (keyMaterialInstance != null)
             {

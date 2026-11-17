@@ -3,6 +3,7 @@ using System.Collections;
 using DeskVR.Peripherals;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace DeskVR.OS
 {
@@ -17,6 +18,7 @@ namespace DeskVR.OS
     /// Implements the pedagogical instruction and accessible feedback module from DIX09 and DIX10.
     /// Provides clear step-by-step goals, audio-independent visual feedback, smart key highlighting,
     /// and safe error tolerance for users with low digital literacy or situational limitations.
+    /// Uses TextMeshPro for crisp, high-legibility VR rendering.
     /// </summary>
     public class DeskVRPedagogicalGuide : MonoBehaviour
     {
@@ -25,14 +27,14 @@ namespace DeskVR.OS
         [SerializeField] private VirtualKeyboardController keyboardController;
 
         [Header("UI Panels & Text")]
-        [SerializeField] private Text stepBadgeText;
-        [SerializeField] private Text mainInstructionText;
-        [SerializeField] private Text subInstructionText;
-        [SerializeField] private Text feedbackBannerText;
+        [SerializeField] private TMP_Text stepBadgeText;
+        [SerializeField] private TMP_Text mainInstructionText;
+        [SerializeField] private TMP_Text subInstructionText;
+        [SerializeField] private TMP_Text feedbackBannerText;
         [SerializeField] private Image feedbackBannerBg;
 
         [Header("Letter Progress Slots")]
-        [SerializeField] private Text[] letterSlotTexts; // H, O, L, A
+        [SerializeField] private TMP_Text[] letterSlotTexts; // H, O, L, A
         [SerializeField] private Image[] letterSlotBgs;
 
         [Header("Action Buttons")]
@@ -195,7 +197,7 @@ namespace DeskVR.OS
             }
             else
             {
-                SetFeedbackBanner("Presiona la tecla [Borrar ⌫] para quitar la letra 'A'.", colorBannerNotice, 2.5f);
+                SetFeedbackBanner("Presiona la tecla [Borrar] para quitar la letra 'A'.", colorBannerNotice, 2.5f);
             }
         }
 
@@ -266,14 +268,13 @@ namespace DeskVR.OS
 
             if (subInstructionText != null)
             {
-                subInstructionText.text = "Presiona la tecla <color=#D83B01><b>[Borrar ⌫]</b></color> en el teclado 3D.";
+                subInstructionText.text = "Presiona la tecla <color=#D83B01><b>[Borrar]</b></color> en el teclado 3D.";
             }
 
             // Highlight Backspace key in gold on virtual keyboard
             if (keyboardController != null)
             {
                 keyboardController.ClearAllHighlights();
-                keyboardController.HighlightKey("Borrar ⌫", true);
                 keyboardController.HighlightKey("Borrar", true);
             }
 
@@ -283,7 +284,7 @@ namespace DeskVR.OS
                 letterSlotBgs[3].color = colorSlotActive;
             }
 
-            SetFeedbackBanner("Identifica la tecla [Borrar ⌫] (iluminada en dorado) y tócala.", colorBannerNotice);
+            SetFeedbackBanner("Identifica la tecla [Borrar] (iluminada en dorado) y tócala.", colorBannerNotice);
         }
 
         private void UpdateCompletedVisuals()
@@ -338,7 +339,6 @@ namespace DeskVR.OS
             {
                 if (keyboardController != null)
                 {
-                    keyboardController.HighlightKey("Borrar ⌫", true);
                     keyboardController.HighlightKey("Borrar", true);
                 }
             }
@@ -359,9 +359,9 @@ namespace DeskVR.OS
             {
                 if (keyboardController != null)
                 {
-                    keyboardController.HighlightKey("Borrar ⌫", true);
+                    keyboardController.HighlightKey("Borrar", true);
                 }
-                SetFeedbackBanner("Pista activada: La tecla [Borrar ⌫] está iluminada en dorado.", colorBannerNotice, 4f);
+                SetFeedbackBanner("Pista activada: La tecla [Borrar] está iluminada en dorado.", colorBannerNotice, 4f);
             }
         }
 
@@ -395,7 +395,7 @@ namespace DeskVR.OS
             }
             else if (currentState == PracticeState.Step2_BackspaceCorrection)
             {
-                SetFeedbackBanner("Pulsa la tecla [Borrar ⌫] en el teclado 3D.", colorBannerNotice);
+                SetFeedbackBanner("Pulsa la tecla [Borrar] en el teclado 3D.", colorBannerNotice);
             }
         }
     }

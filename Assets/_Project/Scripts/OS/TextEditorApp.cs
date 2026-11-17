@@ -2,19 +2,19 @@ using System;
 using System.Collections;
 using DeskVR.Peripherals;
 using UnityEngine;
-using UnityEngine.UI;
+using TMPro;
 
 namespace DeskVR.OS
 {
     /// <summary>
     /// Simulated Notepad application.
-    /// Receives keypresses from the 3D physical keyboard and renders text on the screen.
+    /// Receives keypresses from the 3D physical keyboard and renders crisp text on the screen with TextMeshPro.
     /// </summary>
     public class TextEditorApp : MonoBehaviour
     {
         [Header("UI References")]
-        [SerializeField] private Text contentText;
-        [SerializeField] private Text placeholderText;
+        [SerializeField] private TMP_Text contentText;
+        [SerializeField] private TMP_Text placeholderText;
         [SerializeField] private VirtualWindow parentWindow;
 
         [Header("Settings")]

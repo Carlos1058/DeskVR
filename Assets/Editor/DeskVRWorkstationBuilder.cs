@@ -7,6 +7,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using DeskVR.Peripherals;
 using DeskVR.OS;
+using TMPro;
 
 namespace DeskVR.Editor
 {
@@ -26,12 +27,14 @@ namespace DeskVR.Editor
             EditorUtility.DisplayDialog(
                 "DeskVR - Escena Lista (DIX09 / DIX10)",
                 "¡Estación completa y Estudio Luminoso actualizados en DeskVR_Main!\n\n" +
-                "• Teclado 3D ampliado (+30%) con letras GRANDES y NEGRAS de alta visibilidad\n" +
-                "• Confirmación con GATILLO: La tecla se hunde al tocarla y se escribe al pulsar el gatillo\n" +
-                "• Selección única: Puntero reducido (7mm) para evitar pulsar múltiples teclas a la vez\n" +
-                "• Módulo pedagógico DIX09 con flujo de 2 pasos ('Escribe HOLA' y corrección de 'A')\n" +
-                "• Feedback textual accesible DIX10 (apto sin audio y para mano no dominante)\n" +
-                "• Símbolos claros en teclas especiales: 'Borrar ⌫', 'Intro ↵', 'Espacio ␣'\n\n" +
+                "• Teclado 3D ampliado (+30%) con letras GRANDES de alta visibilidad\n" +
+                "• Confirmación con GATILLO: La tecla se hunde suavemente y se escribe al pulsar el gatillo\n" +
+                "• Animación fluida: Teclas con movimiento suave (lerp) y rebote al confirmar\n" +
+                "• Láser visual: Puntero láser desde cada controlador para guiar la puntería\n" +
+                "• Audio feedback: Click sonoro procedural al confirmar teclas\n" +
+                "• Ambiente inmersivo: Sonido ambiental de habitación + reloj de pared + detalles decorativos\n" +
+                "• Módulo pedagógico DIX09 con flujo de 2 pasos ('Escribe HOLA' y corrección)\n" +
+                "• Feedback textual accesible DIX10 (apto sin audio y para mano no dominante)\n\n" +
                 "¡Dale a Play ▶️ para probar con tus Quest 2!",
                 "¡Excelente!"
             );
@@ -206,17 +209,20 @@ namespace DeskVR.Editor
             startRect.sizeDelta = new Vector2(150f, 48f);
             startBtn.GetComponent<Image>().color = new Color(0.12f, 0.45f, 0.85f);
 
-            GameObject startText = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            TMP_FontAsset defaultTmpFont = GetDefaultTMPFont();
+
+            GameObject startText = new GameObject("Label", typeof(RectTransform));
             startText.transform.SetParent(startBtn.transform, false);
             RectTransform startTextRect = startText.GetComponent<RectTransform>();
             startTextRect.anchorMin = Vector2.zero;
             startTextRect.anchorMax = Vector2.one;
             startTextRect.sizeDelta = Vector2.zero;
-            Text txtStart = startText.GetComponent<Text>();
-            txtStart.text = "🖥️ DeskVR";
-            txtStart.alignment = TextAnchor.MiddleCenter;
-            txtStart.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            txtStart.fontSize = 24;
+            TextMeshProUGUI txtStart = startText.AddComponent<TextMeshProUGUI>();
+            if (defaultTmpFont != null) txtStart.font = defaultTmpFont;
+            txtStart.text = "DeskVR";
+            txtStart.alignment = TextAlignmentOptions.Center;
+            txtStart.fontSize = 22;
+            txtStart.fontStyle = FontStyles.Bold;
             txtStart.color = Color.white;
 
             // 6c. Desktop App Icon (Bloc de Notas)
@@ -237,17 +243,18 @@ namespace DeskVR.Editor
             cb.pressedColor = new Color(0.1f, 0.3f, 0.7f);
             iconBtn.colors = cb;
 
-            GameObject iconText = new GameObject("IconLabel", typeof(RectTransform), typeof(Text));
+            GameObject iconText = new GameObject("IconLabel", typeof(RectTransform));
             iconText.transform.SetParent(notepadIcon.transform, false);
             RectTransform iconTextRect = iconText.GetComponent<RectTransform>();
             iconTextRect.anchorMin = Vector2.zero;
             iconTextRect.anchorMax = Vector2.one;
             iconTextRect.sizeDelta = Vector2.zero;
-            Text txtIcon = iconText.GetComponent<Text>();
-            txtIcon.text = "📝\nBloc de\nNotas";
-            txtIcon.alignment = TextAnchor.MiddleCenter;
-            txtIcon.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            TextMeshProUGUI txtIcon = iconText.AddComponent<TextMeshProUGUI>();
+            if (defaultTmpFont != null) txtIcon.font = defaultTmpFont;
+            txtIcon.text = "Bloc de\nNotas";
+            txtIcon.alignment = TextAlignmentOptions.Center;
             txtIcon.fontSize = 20;
+            txtIcon.fontStyle = FontStyles.Bold;
             txtIcon.color = Color.white;
 
             // 6d. Notepad Window
@@ -319,6 +326,9 @@ namespace DeskVR.Editor
 
             // Lighting Setup (Natural Warm Daylight + Ambient Boost)
             ConfigureLighting();
+
+            // Ambient Sound Manager (Immersive room environment)
+            BuildAmbientSoundManager(root.transform);
 
             // Ensure EventSystem exists in the scene
             if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() == null)
@@ -479,6 +489,12 @@ namespace DeskVR.Editor
 
             // 7. Floating Shelf on Back Wall (with books & art)
             BuildWallShelf(room.transform, baseboardMat);
+
+            // 8. Wall Clock on Back Wall (Visual source of ambient ticking)
+            BuildWallClock(room.transform, baseboardMat);
+
+            // 9. Modern Framed Wall Art on Right Wall
+            BuildFramedArt(room.transform, baseboardMat);
         }
 
         private static void CreateBaseboard(Transform parent, Vector3 pos, Vector3 scale, Material mat)
@@ -578,6 +594,128 @@ namespace DeskVR.Editor
             book2.GetComponent<MeshRenderer>().sharedMaterial = bookMat2;
         }
 
+        private static void BuildWallClock(Transform parent, Material frameMat)
+        {
+            GameObject clockRoot = new GameObject("Wall_Clock");
+            clockRoot.transform.SetParent(parent, false);
+            clockRoot.transform.position = new Vector3(0.95f, 2.15f, 2.58f);
+            clockRoot.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+
+            // Frame (Cylinder)
+            GameObject frame = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            frame.name = "Clock_Frame";
+            frame.transform.SetParent(clockRoot.transform, false);
+            frame.transform.localScale = new Vector3(0.36f, 0.015f, 0.36f);
+            frame.GetComponent<MeshRenderer>().sharedMaterial = frameMat;
+            UnityEngine.Object.DestroyImmediate(frame.GetComponent<Collider>());
+
+            // Clock Face
+            Material faceMat = CreateColorMaterial("ClockFaceMat", new Color(0.96f, 0.95f, 0.92f), 0.1f);
+            GameObject face = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            face.name = "Clock_Face";
+            face.transform.SetParent(clockRoot.transform, false);
+            face.transform.localPosition = new Vector3(0f, 0.008f, 0f);
+            face.transform.localScale = new Vector3(0.32f, 0.014f, 0.32f);
+            face.GetComponent<MeshRenderer>().sharedMaterial = faceMat;
+            UnityEngine.Object.DestroyImmediate(face.GetComponent<Collider>());
+
+            // Center Pin
+            Material darkPinMat = CreateColorMaterial("ClockHandsMat", new Color(0.12f, 0.12f, 0.14f), 0.2f);
+            GameObject pin = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            pin.name = "Clock_Pin";
+            pin.transform.SetParent(clockRoot.transform, false);
+            pin.transform.localPosition = new Vector3(0f, 0.018f, 0f);
+            pin.transform.localScale = new Vector3(0.02f, 0.015f, 0.02f);
+            pin.GetComponent<MeshRenderer>().sharedMaterial = darkPinMat;
+            UnityEngine.Object.DestroyImmediate(pin.GetComponent<Collider>());
+
+            // Hour Hand
+            GameObject hourHand = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            hourHand.name = "Hand_Hour";
+            hourHand.transform.SetParent(clockRoot.transform, false);
+            hourHand.transform.localPosition = new Vector3(-0.035f, 0.018f, 0.028f);
+            hourHand.transform.localRotation = Quaternion.Euler(0f, -40f, 0f);
+            hourHand.transform.localScale = new Vector3(0.012f, 0.008f, 0.075f);
+            hourHand.GetComponent<MeshRenderer>().sharedMaterial = darkPinMat;
+            UnityEngine.Object.DestroyImmediate(hourHand.GetComponent<Collider>());
+
+            // Minute Hand
+            GameObject minuteHand = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            minuteHand.name = "Hand_Minute";
+            minuteHand.transform.SetParent(clockRoot.transform, false);
+            minuteHand.transform.localPosition = new Vector3(0.045f, 0.019f, 0.038f);
+            minuteHand.transform.localRotation = Quaternion.Euler(0f, 40f, 0f);
+            minuteHand.transform.localScale = new Vector3(0.008f, 0.008f, 0.110f);
+            minuteHand.GetComponent<MeshRenderer>().sharedMaterial = darkPinMat;
+            UnityEngine.Object.DestroyImmediate(minuteHand.GetComponent<Collider>());
+        }
+
+        private static void BuildFramedArt(Transform parent, Material frameMat)
+        {
+            GameObject artRoot = new GameObject("Wall_FramedArt");
+            artRoot.transform.SetParent(parent, false);
+            artRoot.transform.position = new Vector3(2.19f, 1.60f, 0.40f);
+            artRoot.transform.rotation = Quaternion.Euler(0f, -90f, 0f);
+
+            // Dark wood frame
+            GameObject frame = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            frame.name = "Art_Frame";
+            frame.transform.SetParent(artRoot.transform, false);
+            frame.transform.localScale = new Vector3(0.90f, 0.65f, 0.025f);
+            frame.GetComponent<MeshRenderer>().sharedMaterial = frameMat;
+            UnityEngine.Object.DestroyImmediate(frame.GetComponent<Collider>());
+
+            // Art Canvas
+            Material artCanvasMat = CreateColorMaterial("ArtCanvasMat", new Color(0.20f, 0.35f, 0.48f), 0.2f);
+            GameObject canvas = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            canvas.name = "Art_Canvas";
+            canvas.transform.SetParent(artRoot.transform, false);
+            canvas.transform.localPosition = new Vector3(0f, 0f, 0.006f);
+            canvas.transform.localScale = new Vector3(0.82f, 0.57f, 0.020f);
+            canvas.GetComponent<MeshRenderer>().sharedMaterial = artCanvasMat;
+            UnityEngine.Object.DestroyImmediate(canvas.GetComponent<Collider>());
+
+            // Inner warm accent geometry
+            Material accentMat = CreateColorMaterial("ArtAccentMat", new Color(0.92f, 0.68f, 0.28f), 0.3f);
+            GameObject accent = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            accent.name = "Art_SunAccent";
+            accent.transform.SetParent(artRoot.transform, false);
+            accent.transform.localPosition = new Vector3(0.12f, 0.06f, 0.018f);
+            accent.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            accent.transform.localScale = new Vector3(0.22f, 0.005f, 0.22f);
+            accent.GetComponent<MeshRenderer>().sharedMaterial = accentMat;
+            UnityEngine.Object.DestroyImmediate(accent.GetComponent<Collider>());
+        }
+
+        private static void BuildAmbientSoundManager(Transform parent)
+        {
+            GameObject ambientGO = new GameObject("Room_AmbientSoundManager");
+            ambientGO.transform.SetParent(parent, false);
+
+            DeskVRAmbientSoundManager soundMgr = ambientGO.AddComponent<DeskVRAmbientSoundManager>();
+            SerializedObject so = new SerializedObject(soundMgr);
+
+            AudioClip ambientClip = AssetDatabase.LoadAssetAtPath<AudioClip>(
+                "Assets/Samples/XR Interaction Toolkit/3.5.1/Hands Interaction Demo/DemoAssets/Audio/AmbientBackgroundNoise.mp3"
+            );
+            if (ambientClip != null)
+            {
+                so.FindProperty("ambientLoop").objectReferenceValue = ambientClip;
+                so.FindProperty("ambientVolume").floatValue = 0.07f;
+            }
+            so.ApplyModifiedProperties();
+        }
+
+        private static TMP_FontAsset GetDefaultTMPFont()
+        {
+            TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/VRTemplateAssets/Fonts/Inter/Inter-Regular SDF.asset");
+            if (font == null)
+            {
+                font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset");
+            }
+            return font;
+        }
+
         private static void ConfigureLighting()
         {
             // 1. Ambient Lighting (Illuminates interior room surfaces evenly)
@@ -598,6 +736,8 @@ namespace DeskVR.Editor
 
         private static TextEditorApp BuildNotepadWindow(Transform canvasTransform, Button triggerIconBtn)
         {
+            TMP_FontAsset tmpFont = GetDefaultTMPFont();
+
             GameObject winGO = new GameObject("Window_BlocNotas", typeof(RectTransform), typeof(Image));
             winGO.transform.SetParent(canvasTransform, false);
             RectTransform winRect = winGO.GetComponent<RectTransform>();
@@ -619,19 +759,19 @@ namespace DeskVR.Editor
             titleRect.sizeDelta = new Vector2(0f, 44f);
             titleBar.GetComponent<Image>().color = new Color(0.14f, 0.18f, 0.26f);
 
-            GameObject titleTextGO = new GameObject("TitleText", typeof(RectTransform), typeof(Text));
+            GameObject titleTextGO = new GameObject("TitleText", typeof(RectTransform));
             titleTextGO.transform.SetParent(titleBar.transform, false);
             RectTransform ttRect = titleTextGO.GetComponent<RectTransform>();
             ttRect.anchorMin = new Vector2(0f, 0f);
             ttRect.anchorMax = new Vector2(1f, 1f);
             ttRect.offsetMin = new Vector2(16f, 0f);
             ttRect.offsetMax = new Vector2(-100f, 0f);
-            Text tt = titleTextGO.GetComponent<Text>();
-            tt.text = "📝 Bloc de Notas (DeskVR)";
-            tt.alignment = TextAnchor.MiddleLeft;
-            tt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            TextMeshProUGUI tt = titleTextGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) tt.font = tmpFont;
+            tt.text = "Bloc de Notas (DeskVR)";
+            tt.alignment = TextAlignmentOptions.MidlineLeft;
             tt.fontSize = 20;
-            tt.fontStyle = FontStyle.Bold;
+            tt.fontStyle = FontStyles.Bold;
             tt.color = Color.white;
 
             GameObject closeBtnGO = new GameObject("Btn_Close", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -645,17 +785,18 @@ namespace DeskVR.Editor
             closeBtnGO.GetComponent<Image>().color = new Color(0.85f, 0.25f, 0.25f);
             Button closeBtn = closeBtnGO.GetComponent<Button>();
 
-            GameObject closeTextGO = new GameObject("X", typeof(RectTransform), typeof(Text));
+            GameObject closeTextGO = new GameObject("X", typeof(RectTransform));
             closeTextGO.transform.SetParent(closeBtnGO.transform, false);
             RectTransform ctRect = closeTextGO.GetComponent<RectTransform>();
             ctRect.anchorMin = Vector2.zero;
             ctRect.anchorMax = Vector2.one;
             ctRect.sizeDelta = Vector2.zero;
-            Text ct = closeTextGO.GetComponent<Text>();
-            ct.text = "✕";
-            ct.alignment = TextAnchor.MiddleCenter;
-            ct.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            TextMeshProUGUI ct = closeTextGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) ct.font = tmpFont;
+            ct.text = "X";
+            ct.alignment = TextAlignmentOptions.Center;
             ct.fontSize = 20;
+            ct.fontStyle = FontStyles.Bold;
             ct.color = Color.white;
 
             GameObject contentArea = new GameObject("ContentArea", typeof(RectTransform), typeof(Image));
@@ -667,33 +808,33 @@ namespace DeskVR.Editor
             caRect.offsetMax = new Vector2(-12f, -50f);
             contentArea.GetComponent<Image>().color = Color.white;
 
-            GameObject textGO = new GameObject("DisplayText", typeof(RectTransform), typeof(Text));
+            GameObject textGO = new GameObject("DisplayText", typeof(RectTransform));
             textGO.transform.SetParent(contentArea.transform, false);
             RectTransform textRect = textGO.GetComponent<RectTransform>();
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
             textRect.offsetMin = new Vector2(16f, 16f);
             textRect.offsetMax = new Vector2(-16f, -16f);
-            Text displayText = textGO.GetComponent<Text>();
+            TextMeshProUGUI displayText = textGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) displayText.font = tmpFont;
             displayText.text = "";
-            displayText.alignment = TextAnchor.UpperLeft;
-            displayText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            displayText.alignment = TextAlignmentOptions.TopLeft;
             displayText.fontSize = 26;
             displayText.color = new Color(0.1f, 0.12f, 0.16f);
 
-            GameObject phGO = new GameObject("Placeholder", typeof(RectTransform), typeof(Text));
+            GameObject phGO = new GameObject("Placeholder", typeof(RectTransform));
             phGO.transform.SetParent(contentArea.transform, false);
             RectTransform phRect = phGO.GetComponent<RectTransform>();
             phRect.anchorMin = Vector2.zero;
             phRect.anchorMax = Vector2.one;
             phRect.offsetMin = new Vector2(16f, 16f);
             phRect.offsetMax = new Vector2(-16f, -16f);
-            Text phText = phGO.GetComponent<Text>();
-            phText.text = "Toca las teclas del teclado 3D en tu mesa para escribir aquí...";
-            phText.alignment = TextAnchor.UpperLeft;
-            phText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            TextMeshProUGUI phText = phGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) phText.font = tmpFont;
+            phText.text = "Toca las teclas del teclado 3D en tu mesa para escribir aqui...";
+            phText.alignment = TextAlignmentOptions.TopLeft;
             phText.fontSize = 22;
-            phText.fontStyle = FontStyle.Italic;
+            phText.fontStyle = FontStyles.Italic;
             phText.color = new Color(0.55f, 0.60f, 0.68f);
 
             TextEditorApp editorApp = contentArea.AddComponent<TextEditorApp>();
@@ -722,6 +863,8 @@ namespace DeskVR.Editor
 
         private static void BuildPedagogicalGuidePanel(Transform canvasTransform, TextEditorApp editorApp)
         {
+            TMP_FontAsset tmpFont = GetDefaultTMPFont();
+
             GameObject guideGO = new GameObject("Panel_PedagogicalGuide", typeof(RectTransform), typeof(Image));
             guideGO.transform.SetParent(canvasTransform, false);
             RectTransform guideRect = guideGO.GetComponent<RectTransform>();
@@ -743,19 +886,19 @@ namespace DeskVR.Editor
             headerRect.sizeDelta = new Vector2(0f, 48f);
             header.GetComponent<Image>().color = new Color(0.12f, 0.20f, 0.32f);
 
-            GameObject headerTextGO = new GameObject("HeaderText", typeof(RectTransform), typeof(Text));
+            GameObject headerTextGO = new GameObject("HeaderText", typeof(RectTransform));
             headerTextGO.transform.SetParent(header.transform, false);
             RectTransform htRect = headerTextGO.GetComponent<RectTransform>();
             htRect.anchorMin = Vector2.zero;
             htRect.anchorMax = Vector2.one;
             htRect.offsetMin = new Vector2(14f, 0f);
             htRect.offsetMax = new Vector2(-14f, 0f);
-            Text ht = headerTextGO.GetComponent<Text>();
-            ht.text = "🎯 GUÍA DE PRÁCTICA · DIX09 / DIX10";
-            ht.alignment = TextAnchor.MiddleLeft;
-            ht.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            ht.fontSize = 20;
-            ht.fontStyle = FontStyle.Bold;
+            TextMeshProUGUI ht = headerTextGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) ht.font = tmpFont;
+            ht.text = "GUIA DE PRACTICA - DIX09 / DIX10";
+            ht.alignment = TextAlignmentOptions.MidlineLeft;
+            ht.fontSize = 19;
+            ht.fontStyle = FontStyles.Bold;
             ht.color = Color.white;
 
             // Step Badge
@@ -769,22 +912,22 @@ namespace DeskVR.Editor
             badgeRect.sizeDelta = new Vector2(380f, 32f);
             stepBadgeGO.GetComponent<Image>().color = new Color(0.85f, 0.91f, 1.0f);
 
-            GameObject badgeTextGO = new GameObject("BadgeText", typeof(RectTransform), typeof(Text));
+            GameObject badgeTextGO = new GameObject("BadgeText", typeof(RectTransform));
             badgeTextGO.transform.SetParent(stepBadgeGO.transform, false);
             RectTransform btRect = badgeTextGO.GetComponent<RectTransform>();
             btRect.anchorMin = Vector2.zero;
             btRect.anchorMax = Vector2.one;
             btRect.sizeDelta = Vector2.zero;
-            Text bt = badgeTextGO.GetComponent<Text>();
-            bt.text = "PASO 1 DE 2 · ESCRITURA";
-            bt.alignment = TextAnchor.MiddleCenter;
-            bt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            bt.fontSize = 18;
-            bt.fontStyle = FontStyle.Bold;
+            TextMeshProUGUI bt = badgeTextGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) bt.font = tmpFont;
+            bt.text = "PASO 1 DE 2 - ESCRITURA";
+            bt.alignment = TextAlignmentOptions.Center;
+            bt.fontSize = 17;
+            bt.fontStyle = FontStyles.Bold;
             bt.color = new Color(0.12f, 0.45f, 0.95f);
 
             // Main Instruction
-            GameObject mainInstGO = new GameObject("MainInstruction", typeof(RectTransform), typeof(Text));
+            GameObject mainInstGO = new GameObject("MainInstruction", typeof(RectTransform));
             mainInstGO.transform.SetParent(guideGO.transform, false);
             RectTransform miRect = mainInstGO.GetComponent<RectTransform>();
             miRect.anchorMin = new Vector2(0f, 1f);
@@ -792,16 +935,16 @@ namespace DeskVR.Editor
             miRect.pivot = new Vector2(0.5f, 1f);
             miRect.anchoredPosition = new Vector2(0f, -100f);
             miRect.sizeDelta = new Vector2(-28f, 55f);
-            Text mainInst = mainInstGO.GetComponent<Text>();
+            TextMeshProUGUI mainInst = mainInstGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) mainInst.font = tmpFont;
             mainInst.text = "Escribe \"HOLA\" en el Bloc de Notas";
-            mainInst.alignment = TextAnchor.MiddleCenter;
-            mainInst.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            mainInst.fontSize = 24;
-            mainInst.fontStyle = FontStyle.Bold;
+            mainInst.alignment = TextAlignmentOptions.Center;
+            mainInst.fontSize = 22;
+            mainInst.fontStyle = FontStyles.Bold;
             mainInst.color = new Color(0.10f, 0.12f, 0.16f);
 
             // Sub Instruction
-            GameObject subInstGO = new GameObject("SubInstruction", typeof(RectTransform), typeof(Text));
+            GameObject subInstGO = new GameObject("SubInstruction", typeof(RectTransform));
             subInstGO.transform.SetParent(guideGO.transform, false);
             RectTransform siRect = subInstGO.GetComponent<RectTransform>();
             siRect.anchorMin = new Vector2(0f, 1f);
@@ -809,10 +952,10 @@ namespace DeskVR.Editor
             siRect.pivot = new Vector2(0.5f, 1f);
             siRect.anchoredPosition = new Vector2(0f, -155f);
             siRect.sizeDelta = new Vector2(-28f, 32f);
-            Text subInst = subInstGO.GetComponent<Text>();
+            TextMeshProUGUI subInst = subInstGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) subInst.font = tmpFont;
             subInst.text = "Siguiente letra a pulsar: [H]";
-            subInst.alignment = TextAnchor.MiddleCenter;
-            subInst.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            subInst.alignment = TextAlignmentOptions.Center;
             subInst.fontSize = 18;
             subInst.color = new Color(0.35f, 0.38f, 0.44f);
 
@@ -826,7 +969,7 @@ namespace DeskVR.Editor
             srRect.anchoredPosition = new Vector2(0f, -195f);
             srRect.sizeDelta = new Vector2(340f, 75f);
 
-            Text[] slotTexts = new Text[4];
+            TMP_Text[] slotTexts = new TMP_Text[4];
             Image[] slotBgs = new Image[4];
             string[] letters = { "H", "O", "L", "A" };
             float slotWidth = 65f;
@@ -847,18 +990,18 @@ namespace DeskVR.Editor
                 slotImg.color = new Color(0.88f, 0.90f, 0.94f);
                 slotBgs[i] = slotImg;
 
-                GameObject slotTextGO = new GameObject("Letter", typeof(RectTransform), typeof(Text));
+                GameObject slotTextGO = new GameObject("Letter", typeof(RectTransform));
                 slotTextGO.transform.SetParent(slotGO.transform, false);
                 RectTransform stRect = slotTextGO.GetComponent<RectTransform>();
                 stRect.anchorMin = Vector2.zero;
                 stRect.anchorMax = Vector2.one;
                 stRect.sizeDelta = Vector2.zero;
-                Text st = slotTextGO.GetComponent<Text>();
+                TextMeshProUGUI st = slotTextGO.AddComponent<TextMeshProUGUI>();
+                if (tmpFont != null) st.font = tmpFont;
                 st.text = letters[i];
-                st.alignment = TextAnchor.MiddleCenter;
-                st.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                st.alignment = TextAlignmentOptions.Center;
                 st.fontSize = 32;
-                st.fontStyle = FontStyle.Bold;
+                st.fontStyle = FontStyles.Bold;
                 st.color = new Color(0.20f, 0.22f, 0.28f);
                 slotTexts[i] = st;
             }
@@ -875,19 +1018,19 @@ namespace DeskVR.Editor
             Image bannerImg = bannerGO.GetComponent<Image>();
             bannerImg.color = new Color(0.14f, 0.18f, 0.26f, 0.95f);
 
-            GameObject bannerTextGO = new GameObject("BannerText", typeof(RectTransform), typeof(Text));
+            GameObject bannerTextGO = new GameObject("BannerText", typeof(RectTransform));
             bannerTextGO.transform.SetParent(bannerGO.transform, false);
             RectTransform btTextRect = bannerTextGO.GetComponent<RectTransform>();
             btTextRect.anchorMin = Vector2.zero;
             btTextRect.anchorMax = Vector2.one;
             btTextRect.offsetMin = new Vector2(16f, 8f);
             btTextRect.offsetMax = new Vector2(-16f, -8f);
-            Text bannerText = bannerTextGO.GetComponent<Text>();
-            bannerText.text = "💡 Usa la punta de tu control para tocar las teclas en la mesa.";
-            bannerText.alignment = TextAnchor.MiddleCenter;
-            bannerText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            bannerText.fontSize = 18;
-            bannerText.fontStyle = FontStyle.Bold;
+            TextMeshProUGUI bannerText = bannerTextGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) bannerText.font = tmpFont;
+            bannerText.text = "Usa la punta de tu control para tocar las teclas en la mesa.";
+            bannerText.alignment = TextAlignmentOptions.Center;
+            bannerText.fontSize = 17;
+            bannerText.fontStyle = FontStyles.Bold;
             bannerText.color = Color.white;
 
             // Buttons Container (Pista, Reiniciar)
@@ -912,18 +1055,18 @@ namespace DeskVR.Editor
             hintBtnGO.GetComponent<Image>().color = new Color(0.12f, 0.45f, 0.85f);
             Button hintBtn = hintBtnGO.GetComponent<Button>();
 
-            GameObject hintTextGO = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            GameObject hintTextGO = new GameObject("Text", typeof(RectTransform));
             hintTextGO.transform.SetParent(hintBtnGO.transform, false);
             RectTransform htr = hintTextGO.GetComponent<RectTransform>();
             htr.anchorMin = Vector2.zero;
             htr.anchorMax = Vector2.one;
             htr.sizeDelta = Vector2.zero;
-            Text hintTxt = hintTextGO.GetComponent<Text>();
-            hintTxt.text = "💡 Ver Pista";
-            hintTxt.alignment = TextAnchor.MiddleCenter;
-            hintTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            TextMeshProUGUI hintTxt = hintTextGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) hintTxt.font = tmpFont;
+            hintTxt.text = "Ver Pista";
+            hintTxt.alignment = TextAlignmentOptions.Center;
             hintTxt.fontSize = 18;
-            hintTxt.fontStyle = FontStyle.Bold;
+            hintTxt.fontStyle = FontStyles.Bold;
             hintTxt.color = Color.white;
 
             // Restart Button
@@ -938,18 +1081,18 @@ namespace DeskVR.Editor
             restartBtnGO.GetComponent<Image>().color = new Color(0.18f, 0.58f, 0.32f);
             Button restartBtn = restartBtnGO.GetComponent<Button>();
 
-            GameObject restTextGO = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            GameObject restTextGO = new GameObject("Text", typeof(RectTransform));
             restTextGO.transform.SetParent(restartBtnGO.transform, false);
             RectTransform rtr = restTextGO.GetComponent<RectTransform>();
             rtr.anchorMin = Vector2.zero;
             rtr.anchorMax = Vector2.one;
             rtr.sizeDelta = Vector2.zero;
-            Text restTxt = restTextGO.GetComponent<Text>();
-            restTxt.text = "🔄 Repetir práctica";
-            restTxt.alignment = TextAnchor.MiddleCenter;
-            restTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            TextMeshProUGUI restTxt = restTextGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) restTxt.font = tmpFont;
+            restTxt.text = "Repetir practica";
+            restTxt.alignment = TextAlignmentOptions.Center;
             restTxt.fontSize = 18;
-            restTxt.fontStyle = FontStyle.Bold;
+            restTxt.fontStyle = FontStyles.Bold;
             restTxt.color = Color.white;
 
             // Accessibility Info Card (Bottom)
@@ -963,17 +1106,17 @@ namespace DeskVR.Editor
             icRect.sizeDelta = new Vector2(410f, 130f);
             infoCardGO.GetComponent<Image>().color = new Color(0.90f, 0.92f, 0.95f);
 
-            GameObject infoTextGO = new GameObject("InfoText", typeof(RectTransform), typeof(Text));
+            GameObject infoTextGO = new GameObject("InfoText", typeof(RectTransform));
             infoTextGO.transform.SetParent(infoCardGO.transform, false);
             RectTransform itRect = infoTextGO.GetComponent<RectTransform>();
             itRect.anchorMin = Vector2.zero;
             itRect.anchorMax = Vector2.one;
             itRect.offsetMin = new Vector2(14f, 10f);
             itRect.offsetMax = new Vector2(-14f, -10f);
-            Text infoTxt = infoTextGO.GetComponent<Text>();
-            infoTxt.text = "<b>Criterios DIX09 & DIX10:</b>\n• Pistas visuales accesibles (apto sin audio)\n• Teclado ampliado con etiquetas de alta visibilidad\n• Tolerancia a errores: corrección asistida con <b>[Borrar ⌫]</b> sin castigo ni reinicio forzado.";
-            infoTxt.alignment = TextAnchor.MiddleLeft;
-            infoTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            TextMeshProUGUI infoTxt = infoTextGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) infoTxt.font = tmpFont;
+            infoTxt.text = "<b>Criterios DIX09 & DIX10:</b>\n* Pistas visuales accesibles (apto sin audio)\n* Teclado ampliado con etiquetas de alta visibilidad\n* Tolerancia a errores: correccion asistida con <b>[Borrar]</b> sin castigo ni reinicio forzado.";
+            infoTxt.alignment = TextAlignmentOptions.MidlineLeft;
             infoTxt.fontSize = 15;
             infoTxt.color = new Color(0.25f, 0.28f, 0.35f);
 
@@ -1011,7 +1154,20 @@ namespace DeskVR.Editor
             kbRb.isKinematic = true;
             kbRb.useGravity = false;
 
-            kbRoot.AddComponent<VirtualKeyboardController>();
+            VirtualKeyboardController kbCtrl = kbRoot.AddComponent<VirtualKeyboardController>();
+
+            // Audio Feedback: Wire key click sound
+            AudioClip clickClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/VRTemplateAssets/Audio/Button_22_click.wav");
+            if (clickClip == null)
+            {
+                clickClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Samples/XR Interaction Toolkit/3.5.1/Hands Interaction Demo/DemoAssets/Audio/ButtonClick.wav");
+            }
+            if (clickClip != null)
+            {
+                SerializedObject kbSO = new SerializedObject(kbCtrl);
+                kbSO.FindProperty("keyClickSound").objectReferenceValue = clickClip;
+                kbSO.ApplyModifiedProperties();
+            }
 
             // 30% Enlarged Chassis for high ergonomics and accessibility
             GameObject chassis = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -1033,7 +1189,7 @@ namespace DeskVR.Editor
                 ("8", "8", KeyActionType.Character, 1f),
                 ("9", "9", KeyActionType.Character, 1f),
                 ("0", "0", KeyActionType.Character, 1f),
-                ("Borrar ⌫", "", KeyActionType.Backspace, 2.0f)
+                ("Borrar", "", KeyActionType.Backspace, 2.0f)
             };
 
             var row1 = new (string, string, KeyActionType, float)[]
@@ -1061,7 +1217,7 @@ namespace DeskVR.Editor
                 ("J", "J", KeyActionType.Character, 1f),
                 ("K", "K", KeyActionType.Character, 1f),
                 ("L", "L", KeyActionType.Character, 1f),
-                ("Intro ↵", "\n", KeyActionType.Enter, 2.0f)
+                ("Intro", "\n", KeyActionType.Enter, 2.0f)
             };
 
             var row3 = new (string, string, KeyActionType, float)[]
@@ -1079,7 +1235,7 @@ namespace DeskVR.Editor
 
             var row4 = new (string, string, KeyActionType, float)[]
             {
-                ("Espacio ␣", " ", KeyActionType.Space, 6.5f)
+                ("Espacio", " ", KeyActionType.Space, 6.5f)
             };
 
             var allRows = new[] { row0, row1, row2, row3, row4 };
@@ -1160,22 +1316,18 @@ namespace DeskVR.Editor
             textRT.anchorMax = Vector2.one;
             textRT.sizeDelta = Vector2.zero;
 
-            // Load high-clarity font
-            Font keyFont = AssetDatabase.LoadAssetAtPath<Font>("Assets/VRTemplateAssets/Fonts/Inter/Inter-Regular.ttf");
-            if (keyFont == null) keyFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (keyFont == null) keyFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
-
-            Text txt = textGO.AddComponent<Text>();
+            TMP_FontAsset tmpFont = GetDefaultTMPFont();
+            TextMeshProUGUI txt = textGO.AddComponent<TextMeshProUGUI>();
+            if (tmpFont != null) txt.font = tmpFont;
             txt.text = label;
-            txt.alignment = TextAnchor.MiddleCenter;
-            txt.font = keyFont;
-            txt.fontStyle = FontStyle.Bold;
+            txt.alignment = TextAlignmentOptions.Center;
+            txt.fontStyle = FontStyles.Bold;
             txt.color = Color.black; // Pure solid black
-            txt.horizontalOverflow = HorizontalWrapMode.Overflow; // NEVER clip or hide
-            txt.verticalOverflow = VerticalWrapMode.Overflow;     // NEVER clip or hide
+            txt.textWrappingMode = TextWrappingModes.NoWrap;
+            txt.overflowMode = TextOverflowModes.Overflow;
             txt.raycastTarget = false;
 
-            // Large, clear font sizing
+            // Large, clear font sizing (SDF renders infinitely crisp)
             if (label.Length == 1)
             {
                 txt.fontSize = 140; // Letters A-Z, Numbers
@@ -1186,7 +1338,7 @@ namespace DeskVR.Editor
             }
             else
             {
-                txt.fontSize = 72; // "Borrar ⌫", "Intro ↵", "Espacio ␣"
+                txt.fontSize = 70; // "Borrar", "Intro", "Espacio"
             }
         }
 

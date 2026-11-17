@@ -8,6 +8,7 @@ namespace DeskVR.Peripherals
     /// Coordinates all 3D keys on the physical virtual keyboard.
     /// Implements precise single-key targeting per pointer (rejecting multi-key overlapping),
     /// visual hover animation on touch, and Index Trigger (gatillo) confirmation to write.
+    /// Features procedural audio click feedback and laser pointer color syncing.
     /// Completely immune to VR headset / camera proximity.
     /// </summary>
     public class VirtualKeyboardController : MonoBehaviour
@@ -32,6 +33,9 @@ namespace DeskVR.Peripherals
         private readonly List<DeskVRPointerTip> activePointers = new List<DeskVRPointerTip>();
         private readonly HashSet<VirtualKey> targetedKeysThisFrame = new HashSet<VirtualKey>();
 
+        // Procedural audio for key click (fallback when no AudioClip assigned)
+        private AudioClip proceduralClickClip;
+
         private void Awake()
         {
             instance = this;
@@ -44,11 +48,52 @@ namespace DeskVR.Peripherals
                 audioSource.playOnAwake = false;
                 audioSource.spatialBlend = 1f; // 3D sound
             }
+
+            // Generate procedural key click sound (crisp, satisfying mechanical click)
+            GenerateProceduralClickSound();
         }
 
         private void Start()
         {
             FindVRPointers();
+        }
+
+        /// <summary>
+        /// Generates a short procedural mechanical key click AudioClip.
+        /// Used as fallback when no keyClickSound asset is assigned.
+        /// Produces a 30ms punchy click with subtle resonance.
+        /// </summary>
+        private void GenerateProceduralClickSound()
+        {
+            int sampleRate = 44100;
+            float duration = 0.035f; // 35ms crisp click
+            int sampleCount = Mathf.CeilToInt(sampleRate * duration);
+            float[] samples = new float[sampleCount];
+
+            for (int i = 0; i < sampleCount; i++)
+            {
+                float t = (float)i / sampleRate;
+                float normalizedT = (float)i / sampleCount;
+
+                // Sharp attack envelope: fast onset, rapid exponential decay
+                float envelope = Mathf.Exp(-normalizedT * 12f);
+
+                // Primary click: mix of frequencies for a mechanical keyboard feel
+                float click = Mathf.Sin(2f * Mathf.PI * 3200f * t) * 0.4f;    // High tick
+                click += Mathf.Sin(2f * Mathf.PI * 1200f * t) * 0.3f;         // Mid body
+                click += Mathf.Sin(2f * Mathf.PI * 650f * t) * 0.2f;          // Low thump
+
+                // Add subtle noise burst for realism (first 5ms)
+                if (t < 0.005f)
+                {
+                    click += (UnityEngine.Random.value * 2f - 1f) * 0.3f * (1f - t / 0.005f);
+                }
+
+                samples[i] = Mathf.Clamp(click * envelope * 0.75f, -1f, 1f);
+            }
+
+            proceduralClickClip = AudioClip.Create("ProceduralKeyClick", sampleCount, 1, sampleRate, false);
+            proceduralClickClip.SetData(samples, 0);
         }
 
         public void RegisterChildKeys()
@@ -134,6 +179,9 @@ namespace DeskVR.Peripherals
                     }
                 }
 
+                // Update laser color based on targeting
+                pointer.SetHoveringKey(closestKey != null);
+
                 // If a key is targeted by this pointer:
                 if (closestKey != null)
                 {
@@ -161,9 +209,16 @@ namespace DeskVR.Peripherals
 
         public static void TriggerKeyPressed(VirtualKey key)
         {
-            if (instance != null && instance.audioSource != null && instance.keyClickSound != null)
+            if (instance != null && instance.audioSource != null)
             {
-                instance.audioSource.PlayOneShot(instance.keyClickSound, 0.7f);
+                // Use assigned AudioClip if available, otherwise use procedural click
+                AudioClip clipToPlay = instance.keyClickSound ?? instance.proceduralClickClip;
+                if (clipToPlay != null)
+                {
+                    // Slight pitch variation for natural feel (±8%)
+                    instance.audioSource.pitch = UnityEngine.Random.Range(0.92f, 1.08f);
+                    instance.audioSource.PlayOneShot(clipToPlay, 0.75f);
+                }
             }
 
             OnKeyPressed?.Invoke(key);
