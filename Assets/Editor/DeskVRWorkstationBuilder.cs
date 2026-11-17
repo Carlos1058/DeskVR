@@ -1295,7 +1295,7 @@ namespace DeskVR.Editor
             labelCanvas.transform.SetParent(keyGO.transform, false);
             // Position 0.52f is just above key top face (0.5f) to avoid z-fighting
             labelCanvas.transform.localPosition = new Vector3(0f, 0.52f, 0f);
-            labelCanvas.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
+            labelCanvas.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
             Canvas c = labelCanvas.AddComponent<Canvas>();
             c.renderMode = RenderMode.WorldSpace;
