@@ -6,10 +6,11 @@ namespace DeskVR.Peripherals
 {
     /// <summary>
     /// Coordinates all 3D keys on the physical virtual keyboard.
-    /// Implements precise single-key targeting per pointer (rejecting multi-key overlapping),
-    /// visual hover animation on touch, and Index Trigger (gatillo) confirmation to write.
-    /// Features procedural audio click feedback and laser pointer color syncing.
-    /// Completely immune to VR headset / camera proximity.
+    /// Implements precise single-key direct touch interaction (touch-to-type) per controller pointer.
+    /// Touching down on a key presses it and types the letter once; holding it down does not repeat.
+    /// Lifting or moving to another key allows immediate typing again.
+    /// Completely independent per hand, with debouncing and zero trigger requirement.
+    /// Absolutely immune to VR headset / camera proximity.
     /// </summary>
     public class VirtualKeyboardController : MonoBehaviour
     {
@@ -22,7 +23,10 @@ namespace DeskVR.Peripherals
 
         [Header("Targeting Constraints")]
         [Tooltip("Maximum distance from pointer tip to key center for contact detection (meters)")]
-        [SerializeField] private float touchRadius = 0.018f;
+        [SerializeField] private float touchRadius = 0.022f;
+
+        [Tooltip("Minimum time (seconds) between consecutive key presses on the same pointer")]
+        [SerializeField] private float debounceInterval = 0.08f;
 
         private static VirtualKeyboardController instance;
         public static VirtualKeyboardController Instance => instance;
@@ -32,6 +36,10 @@ namespace DeskVR.Peripherals
 
         private readonly List<DeskVRPointerTip> activePointers = new List<DeskVRPointerTip>();
         private readonly HashSet<VirtualKey> targetedKeysThisFrame = new HashSet<VirtualKey>();
+
+        // Per-pointer press tracking: which key is currently being touched down by each pointer
+        private readonly Dictionary<DeskVRPointerTip, VirtualKey> pointerCurrentKey = new Dictionary<DeskVRPointerTip, VirtualKey>();
+        private readonly Dictionary<DeskVRPointerTip, float> pointerLastTypeTime = new Dictionary<DeskVRPointerTip, float>();
 
         // Procedural audio for key click (fallback when no AudioClip assigned)
         private AudioClip proceduralClickClip;
@@ -49,7 +57,6 @@ namespace DeskVR.Peripherals
                 audioSource.spatialBlend = 1f; // 3D sound
             }
 
-            // Generate procedural key click sound (crisp, satisfying mechanical click)
             GenerateProceduralClickSound();
         }
 
@@ -58,15 +65,10 @@ namespace DeskVR.Peripherals
             FindVRPointers();
         }
 
-        /// <summary>
-        /// Generates a short procedural mechanical key click AudioClip.
-        /// Used as fallback when no keyClickSound asset is assigned.
-        /// Produces a 30ms punchy click with subtle resonance.
-        /// </summary>
         private void GenerateProceduralClickSound()
         {
             int sampleRate = 44100;
-            float duration = 0.035f; // 35ms crisp click
+            float duration = 0.035f;
             int sampleCount = Mathf.CeilToInt(sampleRate * duration);
             float[] samples = new float[sampleCount];
 
@@ -75,15 +77,11 @@ namespace DeskVR.Peripherals
                 float t = (float)i / sampleRate;
                 float normalizedT = (float)i / sampleCount;
 
-                // Sharp attack envelope: fast onset, rapid exponential decay
                 float envelope = Mathf.Exp(-normalizedT * 12f);
+                float click = Mathf.Sin(2f * Mathf.PI * 3200f * t) * 0.4f;
+                click += Mathf.Sin(2f * Mathf.PI * 1200f * t) * 0.3f;
+                click += Mathf.Sin(2f * Mathf.PI * 650f * t) * 0.2f;
 
-                // Primary click: mix of frequencies for a mechanical keyboard feel
-                float click = Mathf.Sin(2f * Mathf.PI * 3200f * t) * 0.4f;    // High tick
-                click += Mathf.Sin(2f * Mathf.PI * 1200f * t) * 0.3f;         // Mid body
-                click += Mathf.Sin(2f * Mathf.PI * 650f * t) * 0.2f;          // Low thump
-
-                // Add subtle noise burst for realism (first 5ms)
                 if (t < 0.005f)
                 {
                     click += (UnityEngine.Random.value * 2f - 1f) * 0.3f * (1f - t / 0.005f);
@@ -164,8 +162,8 @@ namespace DeskVR.Peripherals
 
                     // Precise footprint: half-extents are [-0.5, 0.5] along X and Z
                     bool insideFootprint = Mathf.Abs(localTip.x) <= 0.55f && Mathf.Abs(localTip.z) <= 0.55f;
-                    // Contact height window: key top is at Y = 0.5; depress contact is [-0.40, 0.65]
-                    bool withinPressHeight = localTip.y >= -0.40f && localTip.y <= 0.65f;
+                    // Contact height window: key top is at Y = 0.5; contact depress is [-0.35, 0.65]
+                    bool withinPressHeight = localTip.y >= -0.35f && localTip.y <= 0.65f;
 
                     float distSq = (tipPos - key.transform.position).sqrMagnitude;
 
@@ -179,30 +177,46 @@ namespace DeskVR.Peripherals
                     }
                 }
 
-                // Update laser color based on targeting
+                // Update laser visual state
                 pointer.SetHoveringKey(closestKey != null);
 
-                // If a key is targeted by this pointer:
+                // Get state for this specific pointer
+                pointerCurrentKey.TryGetValue(pointer, out VirtualKey currentKeyForPointer);
+                pointerLastTypeTime.TryGetValue(pointer, out float lastPressTime);
+
                 if (closestKey != null)
                 {
                     targetedKeysThisFrame.Add(closestKey);
-                    closestKey.SetHovered(true);
 
-                    // Confirm keystroke ONLY when index trigger (gatillo) is pressed
-                    if (pointer.WasTriggerPressedThisFrame())
+                    // DIRECT TOUCH-TO-TYPE:
+                    // Trigger key ONLY when pointer transitions into a new key
+                    if (currentKeyForPointer != closestKey)
                     {
-                        closestKey.ConfirmPress(pointer);
+                        if (Time.time - lastPressTime >= debounceInterval)
+                        {
+                            pointerCurrentKey[pointer] = closestKey;
+                            pointerLastTypeTime[pointer] = Time.time;
+                            closestKey.Press(pointer);
+                        }
+                    }
+                }
+                else
+                {
+                    // Pointer lifted or exited key: clear held state so user can press again
+                    if (currentKeyForPointer != null)
+                    {
+                        pointerCurrentKey[pointer] = null;
                     }
                 }
             }
 
-            // Un-hover any key that is not targeted by any pointer this frame
+            // Update physical depression state for all keys
             for (int i = 0; i < allKeys.Count; i++)
             {
                 var key = allKeys[i];
-                if (key != null && key.IsHovered && !targetedKeysThisFrame.Contains(key))
+                if (key != null)
                 {
-                    key.SetHovered(false);
+                    key.SetDepressed(targetedKeysThisFrame.Contains(key));
                 }
             }
         }
@@ -211,11 +225,9 @@ namespace DeskVR.Peripherals
         {
             if (instance != null && instance.audioSource != null)
             {
-                // Use assigned AudioClip if available, otherwise use procedural click
                 AudioClip clipToPlay = instance.keyClickSound ?? instance.proceduralClickClip;
                 if (clipToPlay != null)
                 {
-                    // Slight pitch variation for natural feel (±8%)
                     instance.audioSource.pitch = UnityEngine.Random.Range(0.92f, 1.08f);
                     instance.audioSource.PlayOneShot(clipToPlay, 0.75f);
                 }
@@ -233,7 +245,6 @@ namespace DeskVR.Peripherals
                 return;
             }
 
-            // Fuzzy lookup if exact match not found (e.g. "Borrar" matching "Borrar ⌫")
             foreach (var kvp in keyLookup)
             {
                 if (kvp.Key.StartsWith(labelOrChar, StringComparison.OrdinalIgnoreCase) ||

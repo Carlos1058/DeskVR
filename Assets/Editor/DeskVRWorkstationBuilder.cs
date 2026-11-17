@@ -27,12 +27,13 @@ namespace DeskVR.Editor
             EditorUtility.DisplayDialog(
                 "DeskVR - Escena Lista (DIX09 / DIX10)",
                 "¡Estación completa y Estudio Luminoso actualizados en DeskVR_Main!\n\n" +
-                "• Teclado 3D ampliado (+30%) con letras GRANDES de alta visibilidad\n" +
-                "• Confirmación con GATILLO: La tecla se hunde suavemente y se escribe al pulsar el gatillo\n" +
-                "• Animación fluida: Teclas con movimiento suave (lerp) y rebote al confirmar\n" +
+                "• Pulsación DIRECTA: Toca la tecla en la mesa para escribirla directamente (sin gatillo)\n" +
+                "• Teclado 3D con letras NEGRAS y GRANDES de alta visibilidad orientadas al usuario\n" +
+                "• Selección única por mando: Previene pulsaciones múltiples y no repite al mantener pulsado\n" +
+                "• Animación fluida: Teclas con movimiento suave (lerp) y rebote elástico al presionar\n" +
                 "• Láser visual: Puntero láser desde cada controlador para guiar la puntería\n" +
-                "• Audio feedback: Click sonoro procedural al confirmar teclas\n" +
-                "• Ambiente inmersivo: Sonido ambiental de habitación + reloj de pared + detalles decorativos\n" +
+                "• Audio feedback: Click sonoro de máquina de escribir al presionar cada tecla\n" +
+                "• Ambiente inmersivo: Sonido ambiental de habitación + reloj de pared 3D\n" +
                 "• Módulo pedagógico DIX09 con flujo de 2 pasos ('Escribe HOLA' y corrección)\n" +
                 "• Feedback textual accesible DIX10 (apto sin audio y para mano no dominante)\n\n" +
                 "¡Dale a Play ▶️ para probar con tus Quest 2!",
@@ -1292,9 +1293,9 @@ namespace DeskVR.Editor
 
             GameObject labelCanvas = new GameObject("LabelCanvas");
             labelCanvas.transform.SetParent(keyGO.transform, false);
-            // Position 0.56f is slightly above key top face (0.5f) to avoid any z-fighting
-            labelCanvas.transform.localPosition = new Vector3(0f, 0.56f, 0f);
-            labelCanvas.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            // Position 0.52f is just above key top face (0.5f) to avoid z-fighting
+            labelCanvas.transform.localPosition = new Vector3(0f, 0.52f, 0f);
+            labelCanvas.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
 
             Canvas c = labelCanvas.AddComponent<Canvas>();
             c.renderMode = RenderMode.WorldSpace;
@@ -1316,18 +1317,22 @@ namespace DeskVR.Editor
             textRT.anchorMax = Vector2.one;
             textRT.sizeDelta = Vector2.zero;
 
-            TMP_FontAsset tmpFont = GetDefaultTMPFont();
-            TextMeshProUGUI txt = textGO.AddComponent<TextMeshProUGUI>();
-            if (tmpFont != null) txt.font = tmpFont;
+            // Load crisp high-contrast font
+            Font keyFont = AssetDatabase.LoadAssetAtPath<Font>("Assets/VRTemplateAssets/Fonts/Inter/Inter-Regular.ttf");
+            if (keyFont == null) keyFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (keyFont == null) keyFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+            Text txt = textGO.AddComponent<Text>();
             txt.text = label;
-            txt.alignment = TextAlignmentOptions.Center;
-            txt.fontStyle = FontStyles.Bold;
+            txt.alignment = TextAnchor.MiddleCenter;
+            txt.font = keyFont;
+            txt.fontStyle = FontStyle.Bold;
             txt.color = Color.black; // Pure solid black
-            txt.textWrappingMode = TextWrappingModes.NoWrap;
-            txt.overflowMode = TextOverflowModes.Overflow;
+            txt.horizontalOverflow = HorizontalWrapMode.Overflow; // NEVER clip or hide
+            txt.verticalOverflow = VerticalWrapMode.Overflow;     // NEVER clip or hide
             txt.raycastTarget = false;
 
-            // Large, clear font sizing (SDF renders infinitely crisp)
+            // Large, clear font sizing
             if (label.Length == 1)
             {
                 txt.fontSize = 140; // Letters A-Z, Numbers
@@ -1338,7 +1343,7 @@ namespace DeskVR.Editor
             }
             else
             {
-                txt.fontSize = 70; // "Borrar", "Intro", "Espacio"
+                txt.fontSize = 68; // "Borrar", "Intro", "Espacio"
             }
         }
 
